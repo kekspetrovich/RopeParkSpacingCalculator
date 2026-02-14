@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { AppConfig, CalculationResult } from '../types';
 import { formatMm } from '../utils/calculations';
-// Fix: Use correct PascalCase for StretchHorizontal icon import
 import { Copy, List, StretchHorizontal as Stretch } from 'lucide-react';
 
 interface ConstructionRulerProps {
@@ -74,8 +73,9 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
   return (
     <div className="w-full bg-white rounded-xl shadow-sm border border-slate-200 p-4">
       <div className="flex items-center justify-between mb-2">
+        {/* Заголовок возвращен к исходному стилю (10px font-black) */}
         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.ruler} (мм)</h3>
-        <div className="flex gap-4 text-[9px] font-bold uppercase text-slate-500">
+        <div className="flex gap-4 text-[9px] font-normal uppercase text-slate-400">
           <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-blue-500 rounded-full"></div> {t.platform}</span>
           <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-red-600 rounded-sm"></div> {t.element}</span>
         </div>
@@ -98,13 +98,13 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
 
           <g>
             <line x1={margin} y1={rulerY - 25} x2={margin} y2={rulerY} stroke="#2563eb" strokeWidth={tickThickness} />
-            <text x={margin} y={rulerY + 25} textAnchor="middle" className="text-[14px] font-black" fill="#1d4ed8">0</text>
+            <text x={margin} y={rulerY + 25} textAnchor="middle" className="text-[14px] font-normal" fill="#1d4ed8">0</text>
           </g>
 
           {elementPositions.map((pos, idx) => {
             const x = getX(pos);
             const isHighDensity = elementPositions.length > 20;
-            const labelY = rulerY - 45;
+            const labelY = rulerY - 35; // Смещение вверх для вертикального текста
             
             return (
               <g key={idx}>
@@ -125,9 +125,9 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
                   x={x} 
                   y={labelY} 
                   textAnchor="start" 
-                  className={`${isHighDensity ? 'text-[9px]' : 'text-[12px]'} font-black`} 
+                  className={`${isHighDensity ? 'text-[11px]' : 'text-[16px]'} font-normal`} // Увеличен размер шрифта меток
                   fill="#0f172a"
-                  transform={`rotate(-60, ${x}, ${labelY})`}
+                  transform={`rotate(-90, ${x}, ${labelY})`} // Поворот до 90 градусов
                 >
                   {formatMm(pos)}
                 </text>
@@ -137,7 +137,7 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
 
           <g>
             <line x1={margin + usableWidth} y1={rulerY - 25} x2={margin + usableWidth} y2={rulerY} stroke="#2563eb" strokeWidth={tickThickness} />
-            <text x={margin + usableWidth} y={rulerY + 25} textAnchor="middle" className="text-[14px] font-black" fill="#1d4ed8">{formatMm(edgeToEdge)}</text>
+            <text x={margin + usableWidth} y={rulerY + 25} textAnchor="middle" className="text-[14px] font-normal" fill="#1d4ed8">{formatMm(edgeToEdge)}</text>
           </g>
         </svg>
       </div>
@@ -145,20 +145,20 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
       <div className="mt-4 pt-4 border-t border-slate-100">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
           <div className="flex flex-col">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter leading-none">{t.sequence}</p>
+            <p className="text-[10px] font-normal text-slate-400 uppercase tracking-tighter leading-none">{t.sequence}</p>
             <span className="text-[9px] text-slate-300 font-medium uppercase mt-0.5">{t.hint}</span>
           </div>
           <div className="flex bg-slate-100 p-1 rounded-lg self-start">
             <button 
               onClick={() => setViewMode('column')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase transition-all ${viewMode === 'column' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-normal uppercase transition-all ${viewMode === 'column' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
             >
               <List className="w-3 h-3" />
               {t.column}
             </button>
             <button 
               onClick={() => setViewMode('row')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase transition-all ${viewMode === 'row' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-normal uppercase transition-all ${viewMode === 'row' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
             >
               <Stretch className="w-3 h-3 rotate-90" />
               {t.row}

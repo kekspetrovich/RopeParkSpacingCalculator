@@ -53,7 +53,7 @@ export const MainDiagram: React.FC<MainDiagramProps> = ({ config, result, lang }
 
   const renderDimension = (x1: number, x2: number, y: number, label: string, color: string = "#64748b", isBelow = false) => {
     const midX = (x1 + x2) / 2;
-    const textYOffset = isBelow ? 28 : -15;
+    const textYOffset = isBelow ? 32 : -18;
     
     return (
       <g>
@@ -64,10 +64,10 @@ export const MainDiagram: React.FC<MainDiagramProps> = ({ config, result, lang }
           x={midX} 
           y={y + textYOffset} 
           textAnchor="middle" 
-          className="font-bold" 
+          className="font-normal" 
           fill={color}
           style={{ 
-            fontSize: '16px', 
+            fontSize: '22px', // Увеличен размер шрифта
             paintOrder: 'stroke', 
             stroke: 'white', 
             strokeWidth: '4px'

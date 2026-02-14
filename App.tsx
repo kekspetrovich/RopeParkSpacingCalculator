@@ -285,7 +285,7 @@ const App: React.FC = () => {
   // Стили для инпутов: Обычный шрифт, темный текст, светлый фон
   const inputContainerClasses = "relative bg-slate-50 border border-slate-300 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all";
   const inputBaseClasses = "w-full bg-transparent px-3 py-2 text-base font-normal text-slate-900 outline-none";
-  const labelClasses = "block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1";
+  const labelClasses = "block text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-1.5 ml-1";
 
   return (
     <div className="min-h-screen pb-20 sm:pb-8 bg-slate-50 font-sans text-slate-900">
@@ -296,11 +296,11 @@ const App: React.FC = () => {
             <div className="bg-blue-600 p-2 rounded-2xl shadow-lg shadow-blue-200">
               <Ruler className="w-5 h-5 text-white" />
             </div>
-            <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight">{t.title}</h1>
+            <h1 className="text-xl font-normal text-slate-800 uppercase tracking-tight">{t.title}</h1>
           </div>
           <button 
             onClick={() => setLang(lang === 'ru' ? 'en' : 'ru')}
-            className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black text-slate-500 hover:bg-slate-50 transition-colors uppercase"
+            className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[10px] font-normal text-slate-500 hover:bg-slate-50 transition-colors uppercase"
           >
             <Languages className="w-3.5 h-3.5" />
             {lang === 'ru' ? 'RU / EN' : 'EN / RU'}
@@ -313,7 +313,7 @@ const App: React.FC = () => {
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-6">
               <div className="flex items-center gap-2 mb-2">
                 <Settings2 className="w-5 h-5 text-blue-600" />
-                <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">{t.settings}</h2>
+                <h2 className="text-sm font-normal text-slate-800 uppercase tracking-widest">{t.settings}</h2>
               </div>
 
               {/* Grouped Controls */}
@@ -326,7 +326,7 @@ const App: React.FC = () => {
                       <button 
                         key={d} 
                         onClick={() => handleDiameterChange(d)} 
-                        className={`py-2 rounded-xl border text-xs font-bold transition-all ${config.diameter === d ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                        className={`py-2 rounded-xl border text-xs font-normal transition-all ${config.diameter === d ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
                       >
                         {d}
                       </button>
@@ -350,8 +350,8 @@ const App: React.FC = () => {
                   <div>
                     <label className={labelClasses}>Режим</label>
                     <div className="flex p-1 bg-slate-100 rounded-xl h-[42px]">
-                      <button onClick={() => handleDistanceModeChange('center-to-center')} className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all uppercase ${config.distanceMode === 'center-to-center' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>{t.axes}</button>
-                      <button onClick={() => handleDistanceModeChange('edge-to-edge')} className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all uppercase ${config.distanceMode === 'edge-to-edge' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>{t.edges}</button>
+                      <button onClick={() => handleDistanceModeChange('center-to-center')} className={`flex-1 py-1 rounded-lg text-[10px] font-normal uppercase transition-all ${config.distanceMode === 'center-to-center' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>{t.axes}</button>
+                      <button onClick={() => handleDistanceModeChange('edge-to-edge')} className={`flex-1 py-1 rounded-lg text-[10px] font-normal uppercase transition-all ${config.distanceMode === 'edge-to-edge' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>{t.edges}</button>
                     </div>
                   </div>
                 </div>
@@ -371,13 +371,13 @@ const App: React.FC = () => {
                         className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-xl transition-all gap-1.5 ${config.elementType === id ? 'bg-white shadow-md text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
                       >
                         <Icon className="w-5 h-5" />
-                        <span className="text-[9px] font-bold uppercase tracking-tight">{label}</span>
+                        <span className="text-[9px] font-normal uppercase tracking-tight">{label}</span>
                       </button>
                     ))}
                   </div>
                   {config.elementType === 'calculated' && (
                     <div className="mt-2 px-1">
-                       <p className="text-[10px] font-bold text-blue-600 uppercase flex items-center gap-1.5 italic">
+                       <p className="text-[10px] font-normal text-blue-600 uppercase flex items-center gap-1.5 italic">
                          {t.widthAuto}: {formatMm(config.boardWidth)} {t.mm}
                        </p>
                     </div>
@@ -431,7 +431,7 @@ const App: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.maxEndGap}</label>
+                      <label className="text-[10px] font-normal text-slate-400 uppercase tracking-widest">{t.maxEndGap}</label>
                       <button 
                         onClick={() => updateConfig({ maxEndGap: 300 })}
                         className="text-lg hover:scale-125 transition-transform active:scale-90 p-1 bg-amber-50 rounded-lg shadow-sm border border-amber-100 leading-none"
@@ -442,7 +442,7 @@ const App: React.FC = () => {
                     </div>
                     <button 
                       onClick={handleToggleMaxEndGapLock} 
-                      className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg transition-all flex items-center gap-1.5 ${config.isMaxEndGapLocked ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                      className={`text-[9px] font-normal uppercase px-2 py-1 rounded-lg transition-all flex items-center gap-1.5 ${config.isMaxEndGapLocked ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
                     >
                       {config.isMaxEndGapLocked ? <Lock className="w-2.5 h-2.5" /> : <Unlock className="w-2.5 h-2.5" />}
                       {t.syncTarget}
@@ -465,7 +465,7 @@ const App: React.FC = () => {
             <div className="grid grid-cols-2 gap-3">
               <button 
                 onClick={handleShare} 
-                className="flex items-center justify-center gap-2 px-4 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl text-[10px] font-black uppercase shadow-sm hover:bg-slate-50 transition-all active:scale-95"
+                className="flex items-center justify-center gap-2 px-4 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl text-[10px] font-normal uppercase shadow-sm hover:bg-slate-50 transition-all active:scale-95"
               >
                 <Share2 className="w-4 h-4" />
                 {t.link}
@@ -473,7 +473,7 @@ const App: React.FC = () => {
               <button 
                 onClick={handleExportImage} 
                 disabled={isExporting} 
-                className={`flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-[10px] font-black uppercase shadow-lg transition-all active:scale-95 ${isExporting ? 'bg-slate-400 text-white' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
+                className={`flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-[10px] font-normal uppercase shadow-lg transition-all active:scale-95 ${isExporting ? 'bg-slate-400 text-white' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
               >
                 <ImageIcon className="w-4 h-4" />
                 {isExporting ? t.creating : t.toImage}
@@ -495,7 +495,7 @@ const App: React.FC = () => {
             {result.warnings.length > 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm flex gap-4 no-print">
                 <div className="bg-amber-100 p-1.5 rounded-lg h-fit"><AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" /></div>
-                <div className="text-[11px] text-amber-900 font-bold uppercase leading-tight tracking-tight">
+                <div className="text-[11px] text-amber-900 font-normal uppercase leading-tight tracking-tight">
                   {result.warnings.map((w, idx) => <div key={idx} className="mb-1">• {w}</div>)}
                 </div>
               </div>
@@ -512,8 +512,8 @@ const App: React.FC = () => {
       {/* Mobile Sticky Summary */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 p-4 sm:hidden flex justify-between items-center z-50 no-print shadow-[0_-8px_30px_rgba(0,0,0,0.08)]">
          <div className="flex flex-col">
-            <span className="text-[10px] text-slate-400 font-black uppercase tracking-tight">{t.stepBetween}</span>
-            <span className="text-xl font-black text-blue-600 leading-none">{Math.round(result.actualGap)} {t.mm}</span>
+            <span className="text-[10px] text-slate-400 font-normal uppercase tracking-tight">{t.stepBetween}</span>
+            <span className="text-xl font-normal text-blue-600 leading-none">{Math.round(result.actualGap)} {t.mm}</span>
          </div>
          <button 
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} 
@@ -528,10 +528,10 @@ const App: React.FC = () => {
 
 const StatBox = ({ label, value, unit, highlight = false }: { label: string, value: string, unit?: string, highlight?: boolean }) => (
   <div className={`bg-white p-4 rounded-2xl shadow-sm border ${highlight ? 'border-blue-200 bg-blue-50/20' : 'border-slate-200'} text-center transition-all`}>
-    <p className="text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest leading-none">{label}</p>
+    <p className="text-[9px] font-normal text-slate-400 uppercase mb-1 tracking-widest leading-none">{label}</p>
     <div className="flex items-baseline justify-center gap-0.5">
-      <span className={`text-lg font-black ${highlight ? 'text-blue-600' : 'text-slate-800'}`}>{value}</span>
-      <span className="text-[10px] font-bold text-slate-400 uppercase">{unit}</span>
+      <span className={`text-lg font-normal ${highlight ? 'text-blue-600' : 'text-slate-800'}`}>{value}</span>
+      <span className="text-[10px] font-medium text-slate-400 uppercase">{unit}</span>
     </div>
   </div>
 );
