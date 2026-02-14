@@ -11,9 +11,11 @@ import {
   Share2, 
   Plus, 
   Minus,
-  Maximize2
+  Maximize2,
+  Lock,
+  Unlock
 } from 'lucide-react';
-import { AppConfig } from './types';
+import { AppConfig, ElementType } from './types';
 import { calculateLayout } from './utils/calculations';
 import { MainDiagram } from './components/MainDiagram';
 import { ConstructionRuler } from './components/ConstructionRuler';
@@ -30,8 +32,8 @@ const INITIAL_STATE: AppConfig = {
   targetGap: 400,
   elementCount: 5,
   maxEndGap: 300,
+  isMaxEndGapLocked: false,
   rulerMarkMode: 'edge',
-  showDimensions: true,
 };
 
 const App: React.FC = () => {
@@ -57,6 +59,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const newResult = calculateLayout(config);
     setResult(newResult);
+    
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
       const configString = JSON.stringify(config);
@@ -68,58 +71,89 @@ const App: React.FC = () => {
   }, [config]);
 
   const updateConfig = (updates: Partial<AppConfig>) => {
-    setConfig(prev => ({ ...prev, ...updates }));
+    setConfig(prev => {
+      const next = { ...prev, ...updates };
+      // If user manually types a value into maxEndGap, we unlock the mode.
+      // We check if maxEndGap is being updated WITHOUT explicitly toggling the lock in the same call.
+      if (updates.maxEndGap !== undefined && updates.isMaxEndGapLocked === undefined) {
+        next.isMaxEndGapLocked = false;
+      }
+      return next;
+    });
+  };
+
+  const deriveWidth = (S: number, G: number, N: number) => {
+    if (N <= 0) return 0;
+    const W = (S - (N + 1) * G) / N;
+    return Math.max(0, Math.round(W));
+  };
+
+  const handleTargetGapChange = (value: number) => {
+    if (config.elementType === 'calculated') {
+      const newWidth = deriveWidth(result.edgeToEdge, value, config.elementCount);
+      updateConfig({ targetGap: value, boardWidth: newWidth });
+    } else {
+      updateConfig({ targetGap: value, distributionMode: 'by-gap' });
+    }
+  };
+
+  const handleElementCountChange = (value: number) => {
+    const newCount = Math.max(0, value);
+    if (config.elementType === 'calculated') {
+      const newWidth = deriveWidth(result.edgeToEdge, config.targetGap, newCount);
+      updateConfig({ elementCount: newCount, boardWidth: newWidth });
+    } else {
+      const tempConfig = { ...config, elementCount: newCount, distributionMode: 'by-count' as const };
+      const tempResult = calculateLayout(tempConfig);
+      updateConfig({
+        elementCount: newCount,
+        distributionMode: 'by-count',
+        targetGap: Math.round(tempResult.actualGap)
+      });
+    }
   };
 
   const handleAdjustCount = (delta: number) => {
-    updateConfig({
-      distributionMode: 'by-count',
-      elementCount: Math.max(0, result.elementCount + delta)
-    });
+    handleElementCountChange(config.elementCount + delta);
+  };
+
+  const handleElementTypeChange = (type: ElementType) => {
+    if (type === 'calculated') {
+      const newWidth = deriveWidth(result.edgeToEdge, config.targetGap, config.elementCount);
+      updateConfig({ elementType: type, boardWidth: newWidth, distributionMode: 'by-count' });
+    } else {
+      updateConfig({ elementType: type });
+    }
+  };
+
+  const handleToggleMaxEndGapLock = () => {
+    const isNowLocked = !config.isMaxEndGapLocked;
+    if (isNowLocked) {
+      updateConfig({ 
+        isMaxEndGapLocked: true, 
+        maxEndGap: config.targetGap 
+      });
+    } else {
+      updateConfig({ isMaxEndGapLocked: false });
+    }
   };
 
   const handleExportImage = async () => {
     const element = document.getElementById('export-container');
     if (!element) return;
-    
     setIsExporting(true);
     try {
       await new Promise(r => setTimeout(r, 200));
-      const canvas = await (window as any).html2canvas(element, {
-        scale: 2,
-        backgroundColor: '#f8fafc',
-        logging: false,
-        useCORS: true
-      });
-      
+      const canvas = await (window as any).html2canvas(element, { scale: 2, backgroundColor: '#f8fafc', logging: false, useCORS: true });
       const image = canvas.toDataURL("image/png");
       const link = document.createElement('a');
       link.href = image;
       link.download = `razmetka-${Date.now()}.png`;
       link.click();
-
-      if (navigator.share && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-        canvas.toBlob(async (blob: Blob | null) => {
-          if (blob) {
-            const file = new File([blob], "razmetka.png", { type: 'image/png' });
-            try {
-              await navigator.share({
-                files: [file],
-                title: 'Строительная разметка',
-                text: 'Схема разметки готова!'
-              });
-            } catch (err) {
-              console.log('Share aborted');
-            }
-          }
-        });
-      }
     } catch (error) {
       console.error('Export failed:', error);
       alert('Ошибка при создании изображения.');
-    } finally {
-      setIsExporting(false);
-    }
+    } finally { setIsExporting(false); }
   };
 
   const handleShare = () => {
@@ -139,13 +173,8 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={handleShare} className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg" title="Поделиться ссылкой"><Share2 className="w-4 h-4" /></button>
-            <button 
-              onClick={handleExportImage} 
-              disabled={isExporting}
-              className={`${isExporting ? 'bg-slate-400' : 'bg-blue-600 hover:bg-blue-700'} text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm flex items-center gap-2 transition-colors active:scale-95`}
-            >
-              <ImageIcon className="w-4 h-4" />
-              <span>{isExporting ? 'Создание...' : 'В картинку'}</span>
+            <button onClick={handleExportImage} disabled={isExporting} className={`${isExporting ? 'bg-slate-400' : 'bg-blue-600 hover:bg-blue-700'} text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm flex items-center gap-2 transition-colors active:scale-95`}>
+              <ImageIcon className="w-4 h-4" /> <span>{isExporting ? 'Создание...' : 'В картинку'}</span>
             </button>
           </div>
         </div>
@@ -153,7 +182,6 @@ const App: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 py-4">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          
           <div className="lg:col-span-4 space-y-4 no-print">
             <section className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
               <h2 className="font-bold text-slate-800 text-[10px] uppercase tracking-widest mb-3 flex items-center gap-2"><Circle className="w-3 h-3 text-blue-500" /> Платформа</h2>
@@ -176,47 +204,77 @@ const App: React.FC = () => {
 
             <section className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
               <h2 className="font-bold text-slate-800 text-[10px] uppercase tracking-widest mb-3 flex items-center gap-2"><Box className="w-3 h-3 text-blue-500" /> Тип элемента</h2>
-              <div className="flex p-1 bg-slate-100 rounded-lg mb-2">
-                <button onClick={() => updateConfig({ elementType: 'point' })} className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.elementType === 'point' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Точка</button>
-                <button onClick={() => updateConfig({ elementType: 'board' })} className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.elementType === 'board' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Доска</button>
+              <div className="flex p-1 bg-slate-100 rounded-lg mb-3">
+                <button onClick={() => handleElementTypeChange('point')} className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.elementType === 'point' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Точка</button>
+                <button onClick={() => handleElementTypeChange('board')} className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.elementType === 'board' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Доска</button>
+                <button onClick={() => handleElementTypeChange('calculated')} className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.elementType === 'calculated' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Рассчитать</button>
               </div>
-              {config.elementType === 'board' && (
-                <input type="number" value={config.boardWidth} onChange={(e) => updateConfig({ boardWidth: Number(e.target.value) })} className={inputClasses} />
+              {config.elementType !== 'point' && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">{config.elementType === 'calculated' ? 'Рассчитанная ширина (мм)' : 'Ширина элемента (мм)'}</label>
+                  <input 
+                    type="number" 
+                    value={config.boardWidth} 
+                    onChange={(e) => updateConfig({ boardWidth: Number(e.target.value) })} 
+                    className={`${inputClasses} ${config.elementType === 'calculated' ? 'bg-blue-50/50 border-blue-200 text-blue-800 cursor-not-allowed' : ''}`}
+                    disabled={config.elementType === 'calculated'}
+                  />
+                  {config.elementType === 'calculated' && <p className="text-[9px] text-blue-500 font-bold italic mt-1">Ширина подбирается автоматически под отступ и количество.</p>}
+                </div>
               )}
             </section>
 
             <section className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
               <h2 className="font-bold text-slate-800 text-[10px] uppercase tracking-widest mb-3 flex items-center gap-2"><LayoutGrid className="w-3 h-3 text-blue-500" /> Размещение</h2>
-              <div className="flex p-1 bg-slate-100 rounded-lg mb-3">
-                <button onClick={() => updateConfig({ distributionMode: 'by-gap' })} className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.distributionMode === 'by-gap' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>По отступу</button>
-                <button onClick={() => updateConfig({ distributionMode: 'by-count' })} className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.distributionMode === 'by-count' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>По количеству</button>
+              <div className="flex p-1 bg-slate-100 rounded-lg mb-4">
+                <button 
+                  onClick={() => updateConfig({ distributionMode: 'by-gap' })} 
+                  disabled={config.elementType === 'calculated'}
+                  className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.elementType === 'calculated' ? 'opacity-30 cursor-not-allowed' : ''} ${config.distributionMode === 'by-gap' && config.elementType !== 'calculated' ? 'bg-blue-600 text-white shadow' : 'text-slate-500'}`}
+                >
+                  По отступу
+                </button>
+                <button 
+                  onClick={() => updateConfig({ distributionMode: 'by-count' })} 
+                  className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.distributionMode === 'by-count' || config.elementType === 'calculated' ? 'bg-blue-600 text-white shadow' : 'text-slate-500'}`}
+                >
+                  По количеству
+                </button>
               </div>
-              
-              {config.distributionMode === 'by-gap' && (
-                <div className="mb-3">
-                  <label className="text-[10px] font-bold text-slate-500 mb-1 block uppercase">Желаемый отступ (мм)</label>
-                  <input type="number" value={config.targetGap} onChange={(e) => updateConfig({ targetGap: Number(e.target.value) })} className={inputClasses} />
-                </div>
-              )}
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 mb-1 block uppercase">Количество элементов</label>
+              <div className={`mb-4 transition-opacity duration-200 ${config.distributionMode === 'by-gap' || config.elementType === 'calculated' ? 'opacity-100' : 'opacity-60'}`}>
+                <label className={`text-[10px] font-bold mb-1 block uppercase transition-colors ${config.distributionMode === 'by-gap' || config.elementType === 'calculated' ? 'text-blue-600' : 'text-slate-500'}`}>Желаемый отступ (мм)</label>
+                <input type="number" value={config.targetGap} onChange={(e) => handleTargetGapChange(Number(e.target.value))} className={`${inputClasses} ${config.distributionMode === 'by-gap' || config.elementType === 'calculated' ? 'border-blue-300 ring-2 ring-blue-500/10' : ''}`} />
+              </div>
+              <div className={`transition-opacity duration-200 ${config.distributionMode === 'by-count' || config.elementType === 'calculated' ? 'opacity-100' : 'opacity-60'}`}>
+                <label className={`text-[10px] font-bold mb-1 block uppercase transition-colors ${config.distributionMode === 'by-count' || config.elementType === 'calculated' ? 'text-blue-600' : 'text-slate-500'}`}>Количество элементов</label>
                 <div className="flex gap-1 items-center">
                   <button onClick={() => handleAdjustCount(-1)} className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 active:bg-slate-200 transition-colors shadow-sm"><Minus className="w-4 h-4" /></button>
-                  <input 
-                    type="number" 
-                    value={result.elementCount} 
-                    onChange={(e) => updateConfig({ distributionMode: 'by-count', elementCount: Math.max(0, Number(e.target.value)) })} 
-                    className="flex-1 min-w-0 bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-center font-bold text-sm text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" 
-                  />
+                  <input type="number" value={config.elementCount} onChange={(e) => handleElementCountChange(Number(e.target.value))} className={`flex-1 min-w-0 bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-center font-bold text-sm text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${config.distributionMode === 'by-count' || config.elementType === 'calculated' ? 'border-blue-300 ring-2 ring-blue-500/10' : ''}`} />
                   <button onClick={() => handleAdjustCount(1)} className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 active:bg-slate-200 transition-colors shadow-sm"><Plus className="w-4 h-4" /></button>
                 </div>
               </div>
             </section>
 
             <section className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <h2 className="font-bold text-slate-800 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2"><Maximize2 className="w-3 h-3 text-blue-500" /> Макс. отступ (мм)</h2>
-              <input type="number" value={config.maxEndGap} onChange={(e) => updateConfig({ maxEndGap: Number(e.target.value) })} className={inputClasses} />
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-bold text-slate-800 text-[10px] uppercase tracking-widest flex items-center gap-2"><Maximize2 className="w-3 h-3 text-blue-500" /> Макс. отступ (мм)</h2>
+                <button 
+                  onClick={handleToggleMaxEndGapLock} 
+                  className={`text-[9px] font-black uppercase px-2 py-1 rounded-md transition-colors flex items-center gap-1.5 ${config.isMaxEndGapLocked ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                >
+                  {config.isMaxEndGapLocked ? <Lock className="w-2.5 h-2.5" /> : <Unlock className="w-2.5 h-2.5" />}
+                  Как желаемый отступ
+                </button>
+              </div>
+              <input 
+                type="number" 
+                value={config.isMaxEndGapLocked ? config.targetGap : config.maxEndGap} 
+                onChange={(e) => updateConfig({ maxEndGap: Number(e.target.value) })} 
+                className={`${inputClasses} ${config.isMaxEndGapLocked ? 'bg-blue-50/50 border-blue-200 text-blue-800' : ''}`} 
+              />
+              {config.isMaxEndGapLocked && (
+                <p className="text-[9px] text-blue-500 font-bold italic mt-1 leading-tight tracking-tight uppercase">Авто-синхронизация с желаемым отступом активна</p>
+              )}
             </section>
           </div>
 
@@ -229,21 +287,13 @@ const App: React.FC = () => {
                 </div>
               </div>
             )}
-
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                <StatBox label="Раб. зона" value={`${Math.round(result.edgeToEdge)}`} unit="мм" />
                <StatBox label="Элементов" value={`${result.elementCount}`} unit="шт" />
                <StatBox label="Между элементами" value={`${Math.round(result.actualGap)}`} unit="мм" highlight />
                <StatBox label="1-й отступ" value={`${Math.round(result.firstElementOffset)}`} unit="мм" />
             </div>
-
             <MainDiagram config={config} result={result} />
-            
-            <div className="no-print flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-              <input type="checkbox" id="showDims" checked={config.showDimensions} onChange={(e) => updateConfig({ showDimensions: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-              <label htmlFor="showDims" className="text-xs text-slate-700 font-bold cursor-pointer select-none">Показывать размеры на схеме</label>
-            </div>
-
             <ConstructionRuler config={config} result={result} />
           </div>
         </div>

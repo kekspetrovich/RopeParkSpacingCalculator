@@ -1,5 +1,5 @@
 
-export type ElementType = 'point' | 'board';
+export type ElementType = 'point' | 'board' | 'calculated';
 export type DistanceMode = 'center-to-center' | 'edge-to-edge';
 export type DistributionMode = 'by-gap' | 'by-count';
 export type RulerMarkMode = 'center' | 'edge';
@@ -14,8 +14,8 @@ export interface AppConfig {
   targetGap: number;
   elementCount: number;
   maxEndGap: number;
+  isMaxEndGapLocked: boolean; // New property to track if maxEndGap should follow actualGap
   rulerMarkMode: RulerMarkMode;
-  showDimensions: boolean;
 }
 
 export interface CalculationResult {

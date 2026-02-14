@@ -10,17 +10,20 @@ interface ConstructionRulerProps {
 
 export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, result }) => {
   const { elementPositions, edgeToEdge } = result;
+  const { elementType, boardWidth } = config;
 
   // SVG parameters
   const margin = 50;
   const viewWidth = 1000;
-  const viewHeight = 140;
+  const viewHeight = 180;
   const usableWidth = viewWidth - (margin * 2);
 
   const getX = (pos: number) => {
     const ratio = edgeToEdge > 0 ? pos / edgeToEdge : 0;
     return margin + (ratio * usableWidth);
   };
+
+  const hasWidth = elementType !== 'point';
 
   // Generate the bracketed string sequence
   const sequence = [
@@ -30,13 +33,16 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
     'Край платформы'
   ];
 
+  const rulerY = viewHeight - 40;
+  const tickThickness = 1.5;
+
   return (
     <div className="w-full bg-white rounded-xl shadow-sm border border-slate-200 p-4">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Линейка разметки (мм)</h3>
         <div className="flex gap-4 text-[9px] font-bold uppercase">
           <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-blue-500 rounded-full"></div> Платформа</span>
-          <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-red-500 rounded-sm"></div> Элемент</span>
+          <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-red-600 rounded-sm"></div> Элемент</span>
         </div>
       </div>
 
@@ -46,37 +52,50 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
           className="w-full h-auto"
           style={{ display: 'block' }}
         >
-          {/* Main ruler line */}
+          {/* Main ruler line - Now Black */}
           <line 
             x1={margin} 
-            y1={viewHeight - 40} 
+            y1={rulerY} 
             x2={margin + usableWidth} 
-            y2={viewHeight - 40} 
-            stroke="#e2e8f0" 
-            strokeWidth="2" 
+            y2={rulerY} 
+            stroke="#0f172a" 
+            strokeWidth="1.5" 
           />
 
           {/* Zero point (First platform edge) */}
           <g>
-            <line x1={margin} y1={viewHeight - 60} x2={margin} y2={viewHeight - 40} stroke="#2563eb" strokeWidth="2" />
-            <text x={margin} y={viewHeight - 20} textAnchor="middle" className="text-[12px] font-black" fill="#1d4ed8">0</text>
+            <line x1={margin} y1={rulerY - 25} x2={margin} y2={rulerY} stroke="#2563eb" strokeWidth={tickThickness} />
+            <text x={margin} y={rulerY + 25} textAnchor="middle" className="text-[14px] font-black" fill="#1d4ed8">0</text>
           </g>
 
-          {/* Element marks */}
+          {/* Element marks & width visualization */}
           {elementPositions.map((pos, idx) => {
             const x = getX(pos);
-            // Label offset calculation for high density
             const isHighDensity = elementPositions.length > 20;
-            const labelY = viewHeight - 85;
+            const labelY = rulerY - 45;
             
             return (
               <g key={idx}>
-                <line x1={x} y1={viewHeight - 75} x2={x} y2={viewHeight - 40} stroke="#ef4444" strokeWidth="1.5" />
+                {/* Element starting tick - Reverted back to red as requested */}
+                <line x1={x} y1={rulerY - 30} x2={x} y2={rulerY} stroke="#dc2626" strokeWidth={tickThickness} />
+                
+                {/* Visual footprint for board elements - Now a Black Horizontal Line */}
+                {hasWidth && (
+                  <line 
+                    x1={x} 
+                    y1={rulerY} 
+                    x2={x + (boardWidth / edgeToEdge) * usableWidth} 
+                    y2={rulerY} 
+                    stroke="#0f172a" 
+                    strokeWidth="4" 
+                  />
+                )}
+
                 <text 
                   x={x} 
                   y={labelY} 
                   textAnchor="start" 
-                  className={`${isHighDensity ? 'text-[8px]' : 'text-[10px]'} font-black`} 
+                  className={`${isHighDensity ? 'text-[9px]' : 'text-[12px]'} font-black`} 
                   fill="#0f172a"
                   transform={`rotate(-60, ${x}, ${labelY})`}
                 >
@@ -88,8 +107,8 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
 
           {/* End point (Second platform edge) */}
           <g>
-            <line x1={margin + usableWidth} y1={viewHeight - 60} x2={margin + usableWidth} y2={viewHeight - 40} stroke="#2563eb" strokeWidth="2" />
-            <text x={margin + usableWidth} y={viewHeight - 20} textAnchor="middle" className="text-[12px] font-black" fill="#1d4ed8">{formatMm(edgeToEdge)}</text>
+            <line x1={margin + usableWidth} y1={rulerY - 25} x2={margin + usableWidth} y2={rulerY} stroke="#2563eb" strokeWidth={tickThickness} />
+            <text x={margin + usableWidth} y={rulerY + 25} textAnchor="middle" className="text-[14px] font-black" fill="#1d4ed8">{formatMm(edgeToEdge)}</text>
           </g>
         </svg>
       </div>
@@ -104,10 +123,6 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
           ))}
         </div>
       </div>
-
-      <p className="mt-4 text-[9px] text-slate-400 italic text-center">
-        * Все размеры указаны от края первой платформы (0 мм). Линейка масштабируется автоматически.
-      </p>
     </div>
   );
 };
