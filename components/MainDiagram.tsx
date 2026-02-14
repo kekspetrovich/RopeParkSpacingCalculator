@@ -1,55 +1,90 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import QRCode from 'https://esm.sh/qrcode';
 import { AppConfig, CalculationResult } from '../types';
 import { formatMm } from '../utils/calculations';
+import { serializeConfig } from '../utils/serialization';
 
 interface MainDiagramProps {
   config: AppConfig;
   result: CalculationResult;
+  lang: 'ru' | 'en';
 }
 
-export const MainDiagram: React.FC<MainDiagramProps> = ({ config, result }) => {
+const LABELS = {
+  ru: {
+    step: 'Шаг',
+    offset: 'Отступ',
+    width: 'Ширина',
+    total: 'Всего',
+    diagram: 'Схема',
+    scan: 'Сканируй для перехода'
+  },
+  en: {
+    step: 'Step',
+    offset: 'Offset',
+    width: 'Width',
+    total: 'Total',
+    diagram: 'Diagram',
+    scan: 'Scan to open'
+  }
+};
+
+export const MainDiagram: React.FC<MainDiagramProps> = ({ config, result, lang }) => {
   const { elementType, boardWidth } = config;
   const { edgeToEdge, elementPositions, firstElementOffset, actualGap } = result;
+  const t = LABELS[lang];
 
-  // --- FIXED SVG COORDINATE SYSTEM (0-1000 x 0-500) ---
+  const [qrUrl, setQrUrl] = useState<string>('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const baseUrl = 'https://kekspetrovich.github.io/RopeParkSpacingCalculator/';
+      const encodedConfig = serializeConfig(config);
+      const fullUrl = `${baseUrl}#${encodedConfig}`;
+      
+      QRCode.toDataURL(fullUrl, {
+        margin: 1,
+        width: 240, 
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff'
+        },
+        errorCorrectionLevel: 'M'
+      })
+      .then(url => setQrUrl(url))
+      .catch(err => console.error('QR Generation failed', err));
+    }, 150); 
+    return () => clearTimeout(timer);
+  }, [config]);
+
+  // --- SVG КООРДИНАТЫ (0-1000 x 0-500) ---
   const viewWidth = 1000;
   const viewHeight = 500;
   const centerY = 250;
 
-  // Horizontal Layout:
-  // We reserve fixed space for margins and platform "heads"
   const sideMargin = 80;
   const platformWidth = 50; 
   
-  const startX = sideMargin + platformWidth; // Left inner edge of platform
-  const endX = viewWidth - sideMargin - platformWidth; // Right inner edge of platform
+  const startX = sideMargin + platformWidth; 
+  const endX = viewWidth - sideMargin - platformWidth; 
   
   const usableWidth = endX - startX;
-  // Scale maps logical mm to SVG units within the working zone
   const scale = edgeToEdge > 0 ? usableWidth / edgeToEdge : 1;
 
-  // Fixed Visual Sizes (Independent of diameter/scale)
   const platformVisualHeight = 120;
   const elemVisualHeight = 50;
   const platformTop = centerY - platformVisualHeight / 2;
   const platformBottom = centerY + platformVisualHeight / 2;
   const elemTop = centerY - elemVisualHeight / 2;
 
-  /**
-   * Renders a dimension line with labels at fixed Y coordinates.
-   * Y values are absolute in 0-500 space.
-   */
   const renderDimension = (x1: number, x2: number, y: number, label: string, color: string = "#64748b", isBelow = false) => {
     const midX = (x1 + x2) / 2;
-    // Keep labels far enough from lines to avoid overlap
     const textYOffset = isBelow ? 28 : -15;
     
     return (
       <g>
-        {/* Main horizontal line */}
         <line x1={x1} y1={y} x2={x2} y2={y} stroke={color} strokeWidth="2" />
-        {/* Ticks at ends */}
         <line x1={x1} y1={y - 10} x2={x1} y2={y + 10} stroke={color} strokeWidth="2" />
         <line x1={x2} y1={y - 10} x2={x2} y2={y + 10} stroke={color} strokeWidth="2" />
         <text 
@@ -72,26 +107,27 @@ export const MainDiagram: React.FC<MainDiagramProps> = ({ config, result }) => {
   };
 
   const hasWidth = elementType !== 'point';
-
-  // Fixed Vertical Slots for Labels (Absolute Y coordinates)
-  const yStep = 60;    // Tier 1 Top
-  const yOffset = 140; // Tier 2 Top
-  const yWidth = 360;  // Tier 1 Bottom
-  const yTotal = 440;  // Tier 2 Bottom
+  const yStep = 90;
+  const yOffset = 165;
+  const yWidth = 335;
+  const yTotal = 410;
 
   return (
-    <div className="w-full bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Схема (мм)</h3>
+    <div className="w-full bg-white rounded-xl shadow-sm border border-slate-200 p-4 relative overflow-hidden">
+      <div className="flex justify-between items-start mb-4">
+        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.diagram} (мм)</h3>
+      </div>
+      
       <div className="w-full overflow-hidden">
         <svg 
           viewBox={`0 0 ${viewWidth} ${viewHeight}`} 
           className="w-full h-auto" 
           style={{ display: 'block', maxWidth: '100%' }}
         >
-          {/* Background Reference Axis */}
+          {/* Базовая ось */}
           <line x1={0} y1={centerY} x2={viewWidth} y2={centerY} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="10,5" />
           
-          {/* Left Platform - Fixed shape bulge inward */}
+          {/* Левая платформа */}
           <path 
             d={`M ${startX - platformWidth},${platformTop} 
                L ${startX - platformWidth},${platformBottom} 
@@ -102,7 +138,7 @@ export const MainDiagram: React.FC<MainDiagramProps> = ({ config, result }) => {
             strokeWidth="3" 
           />
           
-          {/* Right Platform - Fixed shape bulge inward */}
+          {/* Правая платформа */}
           <path 
             d={`M ${endX + platformWidth},${platformTop} 
                L ${endX + platformWidth},${platformBottom} 
@@ -113,10 +149,10 @@ export const MainDiagram: React.FC<MainDiagramProps> = ({ config, result }) => {
             strokeWidth="3" 
           />
 
-          {/* Working axis line between platforms - Now Black and Thinner */}
+          {/* Центральная линия */}
           <line x1={startX} y1={centerY} x2={endX} y2={centerY} stroke="#0f172a" strokeWidth="1" strokeDasharray="8,4" />
 
-          {/* Elements - Width scales, Height is constant */}
+          {/* Элементы разметки */}
           {elementPositions.map((pos, idx) => {
             const x = startX + (pos * scale);
             if (elementType === 'point') {
@@ -127,46 +163,53 @@ export const MainDiagram: React.FC<MainDiagramProps> = ({ config, result }) => {
             }
           })}
 
-          {/* Dimensions Section - Absolute Y coordinates, Scaled X coordinates */}
+          {/* Размеры */}
           <g>
-            {/* Top Tier 1: Step (Gap + Width) */}
             {elementPositions.length > 1 && renderDimension(
               startX + (firstElementOffset + (hasWidth ? boardWidth : 0)) * scale,
               startX + (firstElementOffset + (hasWidth ? boardWidth : 0) + actualGap) * scale,
               yStep, 
-              `Шаг: ${formatMm(actualGap)}`,
+              `${t.step}: ${formatMm(actualGap)}`,
               "#dc2626"
             )}
 
-            {/* Top Tier 2: Offset (From edge to first element) */}
             {renderDimension(
               startX, 
               startX + (firstElementOffset * scale), 
               yOffset, 
-              `Отступ: ${formatMm(firstElementOffset)}`,
+              `${t.offset}: ${formatMm(firstElementOffset)}`,
               "#2563eb"
             )}
 
-            {/* Bottom Tier 1: Width (Element size) */}
             {hasWidth && elementPositions.length > 0 && renderDimension(
               startX + (firstElementOffset * scale),
               startX + ((firstElementOffset + boardWidth) * scale),
               yWidth,
-              `Ширина: ${formatMm(boardWidth)}`,
+              `${t.width}: ${formatMm(boardWidth)}`,
               "#7c3aed",
               true
             )}
 
-            {/* Bottom Tier 2: Total Working Distance */}
             {renderDimension(
               startX, 
               endX, 
               yTotal, 
-              `Всего: ${formatMm(edgeToEdge)} мм`,
+              `${t.total}: ${formatMm(edgeToEdge)} мм`,
               "#0f172a",
               true
             )}
           </g>
+
+          {/* QR-код отрисовываем в самом конце, чтобы он был поверх всех остальных элементов */}
+          {qrUrl && (
+            <g transform={`translate(${viewWidth - 210}, 5)`}>
+              <rect x="0" y="0" width="200" height="200" fill="white" rx="8" shadow="0 4px 6px -1px rgb(0 0 0 / 0.1)" />
+              <image href={qrUrl} x="5" y="5" width="190" height="190" />
+              <text x="100" y="215" textAnchor="middle" className="text-[12px] font-black fill-slate-400 uppercase tracking-tighter" style={{ paintOrder: 'stroke', stroke: 'white', strokeWidth: '2px' }}>
+                {t.scan}
+              </text>
+            </g>
+          )}
         </svg>
       </div>
     </div>
