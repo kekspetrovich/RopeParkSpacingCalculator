@@ -14,10 +14,11 @@ import {
   Maximize2,
   Lock,
   Unlock,
-  Languages
+  Languages,
+  Ruler
 } from 'lucide-react';
 import { AppConfig, ElementType, DistanceMode, DistributionMode, RulerMarkMode } from './types';
-import { calculateLayout } from './utils/calculations';
+import { calculateLayout, formatMm } from './utils/calculations';
 import { serializeConfig, deserializeConfig } from './utils/serialization';
 import { MainDiagram } from './components/MainDiagram';
 import { ConstructionRuler } from './components/ConstructionRuler';
@@ -49,28 +50,29 @@ const TRANSLATIONS = {
     point: 'Точка',
     segment: 'Отрезок',
     calculate: 'Рассчитать',
-    segmentWidth: 'Ширина отрезка (мм)',
-    calcWidth: 'Рассчитанная ширина (мм)',
-    widthAuto: 'Ширина подбирается автоматически под отступ и количество.',
+    segmentWidth: 'Ширина (мм)',
+    calcWidth: 'Рассчитанная ширина',
+    widthAuto: 'Авто-подбор ширины',
     distribution: 'Размещение',
     byGap: 'По отступу',
     byCount: 'По количеству',
     targetGap: 'Желаемый отступ (мм)',
-    elementCount: 'Количество элементов',
-    maxEndGap: 'Первый шаг. MAX (мм)',
+    elementCount: 'Количество',
+    maxEndGap: 'MAX 1-й отступ (мм)',
     syncTarget: 'Как желаемый отступ',
-    syncActive: 'Авто-синхронизация активна',
-    calcResults: 'Результаты расчета',
+    syncActive: 'Синхронизация активна',
+    calcResults: 'Результаты',
     link: 'Ссылка',
     toImage: 'В картинку',
-    platformDist: 'От края до края',
+    platformDist: 'Край-Край',
     elements: 'Элементов',
     betweenElements: 'Между элементами',
     firstOffset: '1-й отступ',
     mm: 'мм',
     pcs: 'шт',
     creating: 'Создание...',
-    stepBetween: 'Шаг между элементами'
+    stepBetween: 'Шаг между элементами',
+    settings: 'Параметры проекта'
   },
   en: {
     title: 'Layout',
@@ -78,22 +80,22 @@ const TRANSLATIONS = {
     distance: 'Distance',
     axes: 'Axes',
     edges: 'Edge-to-Edge',
-    elementType: 'Element Type',
+    elementType: 'Type',
     point: 'Point',
     segment: 'Segment',
     calculate: 'Calculate',
-    segmentWidth: 'Segment Width (mm)',
-    calcWidth: 'Calculated Width (mm)',
-    widthAuto: 'Width is auto-adjusted to fit gap and count.',
+    segmentWidth: 'Width (mm)',
+    calcWidth: 'Calc Width',
+    widthAuto: 'Auto width',
     distribution: 'Distribution',
     byGap: 'By Gap',
     byCount: 'By Count',
     targetGap: 'Target Gap (mm)',
-    elementCount: 'Element Count',
-    maxEndGap: '1st Step. MAX (mm)',
-    syncTarget: 'Sync with Target',
-    syncActive: 'Auto-sync active',
-    calcResults: 'Calculation Results',
+    elementCount: 'Count',
+    maxEndGap: 'MAX 1st Gap (mm)',
+    syncTarget: 'Sync with Gap',
+    syncActive: 'Sync active',
+    calcResults: 'Results',
     link: 'Link',
     toImage: 'To Image',
     platformDist: 'Edge-to-Edge',
@@ -103,7 +105,8 @@ const TRANSLATIONS = {
     mm: 'mm',
     pcs: 'pcs',
     creating: 'Creating...',
-    stepBetween: 'Step between elements'
+    stepBetween: 'Step between',
+    settings: 'Project Settings'
   }
 };
 
@@ -126,7 +129,7 @@ const App: React.FC = () => {
     try {
       const hash = window.location.hash.substring(1);
       if (hash) {
-        if (hash.startsWith('v2_')) {
+        if (hash.startsWith('v2_') || hash.startsWith('v3_')) {
           const deserialized = deserializeConfig(hash);
           if (deserialized) return { ...base, ...deserialized };
         } else {
@@ -137,21 +140,18 @@ const App: React.FC = () => {
     return base;
   });
 
-  // ВАЖНО: Расчет результата ПРЯМО во время рендера, чтобы избежать устаревших замыканий
   const result = useMemo(() => calculateLayout(config), [config]);
 
   useEffect(() => {
     localStorage.setItem('app_lang', lang);
   }, [lang]);
 
-  // Синхронизация URL и локального хранилища при каждом изменении конфига
   useEffect(() => {
-    // Если мы в режиме "по отступу", нужно синхронизировать реальное количество элементов в конфиг
     if (config.distributionMode === 'by-gap' && 
         config.elementType !== 'calculated' && 
         result.elementCount !== config.elementCount) {
       setConfig(prev => ({ ...prev, elementCount: result.elementCount }));
-      return; // Дальнейшее выполнение произойдет в следующем цикле эффекта
+      return;
     }
 
     try {
@@ -167,7 +167,6 @@ const App: React.FC = () => {
   const updateConfig = (updates: Partial<AppConfig>) => {
     setConfig(prev => {
       const next = { ...prev, ...updates };
-      // Автоматическое переключение режима при изменении параметров
       if (updates.maxEndGap !== undefined && updates.isMaxEndGapLocked === undefined) {
         next.isMaxEndGapLocked = false;
       }
@@ -179,6 +178,36 @@ const App: React.FC = () => {
     if (N <= 0) return 0;
     const W = (S - (N + 1) * G) / N;
     return Math.max(0, Math.round(W));
+  };
+
+  const handleDiameterChange = (d: number) => {
+    if (config.elementType === 'calculated') {
+      const tempS = config.distanceMode === 'center-to-center' ? config.distanceValue - d : config.distanceValue;
+      const newWidth = deriveWidth(tempS, config.targetGap, config.elementCount);
+      updateConfig({ diameter: d, boardWidth: newWidth });
+    } else {
+      updateConfig({ diameter: d });
+    }
+  };
+
+  const handleDistanceValueChange = (v: number) => {
+    if (config.elementType === 'calculated') {
+      const tempS = config.distanceMode === 'center-to-center' ? v - config.diameter : v;
+      const newWidth = deriveWidth(tempS, config.targetGap, config.elementCount);
+      updateConfig({ distanceValue: v, boardWidth: newWidth });
+    } else {
+      updateConfig({ distanceValue: v });
+    }
+  };
+
+  const handleDistanceModeChange = (mode: DistanceMode) => {
+    if (config.elementType === 'calculated') {
+      const tempS = mode === 'center-to-center' ? config.distanceValue - config.diameter : config.distanceValue;
+      const newWidth = deriveWidth(tempS, config.targetGap, config.elementCount);
+      updateConfig({ distanceMode: mode, boardWidth: newWidth });
+    } else {
+      updateConfig({ distanceMode: mode });
+    }
   };
 
   const handleTargetGapChange = (value: number) => {
@@ -196,7 +225,6 @@ const App: React.FC = () => {
       const newWidth = deriveWidth(result.edgeToEdge, config.targetGap, newCount);
       updateConfig({ elementCount: newCount, boardWidth: newWidth });
     } else {
-      // Предварительный расчет для обновления targetGap при ручном изменении количества
       const tempConfig = { ...config, elementCount: newCount, distributionMode: 'by-count' as const };
       const tempResult = calculateLayout(tempConfig);
       updateConfig({
@@ -246,7 +274,6 @@ const App: React.FC = () => {
       link.click();
     } catch (error) {
       console.error('Export failed:', error);
-      alert(lang === 'ru' ? 'Ошибка при создании изображения.' : 'Export failed.');
     } finally { setIsExporting(false); }
   };
 
@@ -255,181 +282,257 @@ const App: React.FC = () => {
     alert(lang === 'ru' ? 'Ссылка скопирована!' : 'Link copied!');
   };
 
-  const inputClasses = "w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-slate-900 font-bold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm";
+  // Стили для инпутов: Обычный шрифт, темный текст, светлый фон
+  const inputContainerClasses = "relative bg-slate-50 border border-slate-300 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all";
+  const inputBaseClasses = "w-full bg-transparent px-3 py-2 text-base font-normal text-slate-900 outline-none";
+  const labelClasses = "block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1";
 
   return (
-    <div className="min-h-screen pb-20 sm:pb-4 bg-slate-50">
-      <main className="max-w-7xl mx-auto px-4 py-4 lg:py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-4 space-y-4 no-print">
-            <div className="flex items-center justify-between mb-2 px-1">
-              <div className="flex items-center gap-2">
-                <LayoutGrid className="text-blue-600 w-5 h-5" />
-                <h1 className="text-lg font-black text-slate-800 uppercase tracking-tight">{t.title}</h1>
+    <div className="min-h-screen pb-20 sm:pb-8 bg-slate-50 font-sans text-slate-900">
+      <main className="max-w-6xl mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-600 p-2 rounded-2xl shadow-lg shadow-blue-200">
+              <Ruler className="w-5 h-5 text-white" />
+            </div>
+            <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight">{t.title}</h1>
+          </div>
+          <button 
+            onClick={() => setLang(lang === 'ru' ? 'en' : 'ru')}
+            className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black text-slate-500 hover:bg-slate-50 transition-colors uppercase"
+          >
+            <Languages className="w-3.5 h-3.5" />
+            {lang === 'ru' ? 'RU / EN' : 'EN / RU'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Settings Column */}
+          <div className="lg:col-span-5 space-y-6 no-print">
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-6">
+              <div className="flex items-center gap-2 mb-2">
+                <Settings2 className="w-5 h-5 text-blue-600" />
+                <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest">{t.settings}</h2>
               </div>
+
+              {/* Grouped Controls */}
+              <div className="space-y-5">
+                {/* Diameter */}
+                <div>
+                  <label className={labelClasses}>{t.platform} (Ø мм)</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[1200, 1500, 1800].map(d => (
+                      <button 
+                        key={d} 
+                        onClick={() => handleDiameterChange(d)} 
+                        className={`py-2 rounded-xl border text-xs font-bold transition-all ${config.diameter === d ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Distance & Mode */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClasses}>{t.distance} (мм)</label>
+                    <div className={inputContainerClasses}>
+                      <input 
+                        type="number" 
+                        value={config.distanceValue} 
+                        onChange={(e) => handleDistanceValueChange(Number(e.target.value))} 
+                        className={inputBaseClasses} 
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelClasses}>Режим</label>
+                    <div className="flex p-1 bg-slate-100 rounded-xl h-[42px]">
+                      <button onClick={() => handleDistanceModeChange('center-to-center')} className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all uppercase ${config.distanceMode === 'center-to-center' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>{t.axes}</button>
+                      <button onClick={() => handleDistanceModeChange('edge-to-edge')} className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all uppercase ${config.distanceMode === 'edge-to-edge' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}>{t.edges}</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Element Type Selection - Icons with Labels */}
+                <div>
+                  <label className={labelClasses}>{t.elementType}</label>
+                  <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-2">
+                    {[
+                      { id: 'point', icon: Circle, label: t.point },
+                      { id: 'board', icon: Box, label: t.segment },
+                      { id: 'calculated', icon: Maximize2, label: t.calculate }
+                    ].map(({ id, icon: Icon, label }) => (
+                      <button 
+                        key={id} 
+                        onClick={() => handleElementTypeChange(id as ElementType)}
+                        className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-xl transition-all gap-1.5 ${config.elementType === id ? 'bg-white shadow-md text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                        <Icon className="w-5 h-5" />
+                        <span className="text-[9px] font-bold uppercase tracking-tight">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {config.elementType === 'calculated' && (
+                    <div className="mt-2 px-1">
+                       <p className="text-[10px] font-bold text-blue-600 uppercase flex items-center gap-1.5 italic">
+                         {t.widthAuto}: {formatMm(config.boardWidth)} {t.mm}
+                       </p>
+                    </div>
+                  )}
+                  {config.elementType === 'board' && (
+                    <div className="mt-4">
+                      <label className={labelClasses}>{t.segmentWidth}</label>
+                      <div className={inputContainerClasses}>
+                        <input 
+                          type="number" 
+                          value={config.boardWidth} 
+                          onChange={(e) => updateConfig({ boardWidth: Number(e.target.value) })} 
+                          className={inputBaseClasses} 
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Distribution: Gap and Count */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClasses}>{t.targetGap}</label>
+                    <div className={inputContainerClasses}>
+                      <input 
+                        type="number" 
+                        value={config.targetGap} 
+                        onChange={(e) => handleTargetGapChange(Number(e.target.value))} 
+                        className={inputBaseClasses} 
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelClasses}>{t.elementCount}</label>
+                    <div className="flex gap-2">
+                      <div className={`${inputContainerClasses} flex-1 flex items-center`}>
+                        <button onClick={() => handleAdjustCount(-1)} className="px-2 py-1 text-slate-400 hover:text-blue-600 transition-colors"><Minus className="w-4 h-4" /></button>
+                        <input 
+                          type="number" 
+                          value={config.elementCount} 
+                          onChange={(e) => handleElementCountChange(Number(e.target.value))} 
+                          className="w-full bg-transparent text-center text-base font-normal text-slate-900 outline-none" 
+                        />
+                        <button onClick={() => handleAdjustCount(1)} className="px-2 py-1 text-slate-400 hover:text-blue-600 transition-colors"><Plus className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Max End Gap with Tractor */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.maxEndGap}</label>
+                      <button 
+                        onClick={() => updateConfig({ maxEndGap: 300 })}
+                        className="text-lg hover:scale-125 transition-transform active:scale-90 p-1 bg-amber-50 rounded-lg shadow-sm border border-amber-100 leading-none"
+                        title="300mm"
+                      >
+                        🚜
+                      </button>
+                    </div>
+                    <button 
+                      onClick={handleToggleMaxEndGapLock} 
+                      className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg transition-all flex items-center gap-1.5 ${config.isMaxEndGapLocked ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                    >
+                      {config.isMaxEndGapLocked ? <Lock className="w-2.5 h-2.5" /> : <Unlock className="w-2.5 h-2.5" />}
+                      {t.syncTarget}
+                    </button>
+                  </div>
+                  <div className={`${inputContainerClasses} ${config.isMaxEndGapLocked ? 'bg-slate-100 border-dashed' : ''}`}>
+                    <input 
+                      type="number" 
+                      value={config.isMaxEndGapLocked ? config.targetGap : config.maxEndGap} 
+                      onChange={(e) => updateConfig({ maxEndGap: Number(e.target.value) })} 
+                      disabled={config.isMaxEndGapLocked}
+                      className={`${inputBaseClasses} ${config.isMaxEndGapLocked ? 'text-slate-400 italic' : ''}`} 
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="grid grid-cols-2 gap-3">
               <button 
-                onClick={() => setLang(lang === 'ru' ? 'en' : 'ru')}
-                className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-white border border-slate-200 px-2 py-1 rounded-lg hover:bg-slate-50 transition-colors"
+                onClick={handleShare} 
+                className="flex items-center justify-center gap-2 px-4 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl text-[10px] font-black uppercase shadow-sm hover:bg-slate-50 transition-all active:scale-95"
               >
-                <Languages className="w-3 h-3" />
-                {lang.toUpperCase()}
+                <Share2 className="w-4 h-4" />
+                {t.link}
+              </button>
+              <button 
+                onClick={handleExportImage} 
+                disabled={isExporting} 
+                className={`flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-[10px] font-black uppercase shadow-lg transition-all active:scale-95 ${isExporting ? 'bg-slate-400 text-white' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
+              >
+                <ImageIcon className="w-4 h-4" />
+                {isExporting ? t.creating : t.toImage}
               </button>
             </div>
-
-            <section className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <h2 className="font-bold text-slate-800 text-[10px] uppercase tracking-widest mb-3 flex items-center gap-2"><Circle className="w-3 h-3 text-blue-500" /> {t.platform}</h2>
-              <div className="grid grid-cols-3 gap-2">
-                {[1200, 1500, 1800].map(d => (
-                  <button key={d} onClick={() => updateConfig({ diameter: d })} className={`py-2 rounded-md border text-xs font-bold transition-colors ${config.diameter === d ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-600'}`}>{d}</button>
-                ))}
-              </div>
-            </section>
-
-            <section className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <h2 className="font-bold text-slate-800 text-[10px] uppercase tracking-widest mb-3 flex items-center gap-2"><ArrowLeftRight className="w-3 h-3 text-blue-500" /> {t.distance}</h2>
-              <div className="flex p-1 bg-slate-100 rounded-lg mb-2">
-                <button onClick={() => updateConfig({ distanceMode: 'center-to-center' })} className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.distanceMode === 'center-to-center' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>{t.axes}</button>
-                <button onClick={() => updateConfig({ distanceMode: 'edge-to-edge' })} className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.distanceMode === 'edge-to-edge' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>{t.edges}</button>
-              </div>
-              <input type="number" value={config.distanceValue} onChange={(e) => updateConfig({ distanceValue: Number(e.target.value) })} className={inputClasses} />
-            </section>
-
-            <section className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <h2 className="font-bold text-slate-800 text-[10px] uppercase tracking-widest mb-3 flex items-center gap-2"><Box className="w-3 h-3 text-blue-500" /> {t.elementType}</h2>
-              <div className="flex p-1 bg-slate-100 rounded-lg mb-3">
-                <button onClick={() => handleElementTypeChange('point')} className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.elementType === 'point' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>{t.point}</button>
-                <button onClick={() => handleElementTypeChange('board')} className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.elementType === 'board' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>{t.segment}</button>
-                <button onClick={() => handleElementTypeChange('calculated')} className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.elementType === 'calculated' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>{t.calculate}</button>
-              </div>
-              {config.elementType !== 'point' && (
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">{config.elementType === 'calculated' ? t.calcWidth : t.segmentWidth}</label>
-                  <input 
-                    type="number" 
-                    value={config.boardWidth} 
-                    onChange={(e) => updateConfig({ boardWidth: Number(e.target.value) })} 
-                    className={`${inputClasses} ${config.elementType === 'calculated' ? 'bg-blue-50/50 border-blue-200 text-blue-800 cursor-not-allowed' : ''}`}
-                    disabled={config.elementType === 'calculated'}
-                  />
-                  {config.elementType === 'calculated' && <p className="text-[9px] text-blue-500 font-bold italic mt-1">{t.widthAuto}</p>}
-                </div>
-              )}
-            </section>
-
-            <section className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <h2 className="font-bold text-slate-800 text-[10px] uppercase tracking-widest mb-3 flex items-center gap-2"><LayoutGrid className="w-3 h-3 text-blue-500" /> {t.distribution}</h2>
-              <div className="flex p-1 bg-slate-100 rounded-lg mb-4">
-                <button 
-                  onClick={() => updateConfig({ distributionMode: 'by-gap' })} 
-                  disabled={config.elementType === 'calculated'}
-                  className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.elementType === 'calculated' ? 'opacity-30 cursor-not-allowed' : ''} ${config.distributionMode === 'by-gap' && config.elementType !== 'calculated' ? 'bg-blue-600 text-white shadow' : 'text-slate-500'}`}
-                >
-                  {t.byGap}
-                </button>
-                <button 
-                  onClick={() => updateConfig({ distributionMode: 'by-count' })} 
-                  className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${config.distributionMode === 'by-count' || config.elementType === 'calculated' ? 'bg-blue-600 text-white shadow' : 'text-slate-500'}`}
-                >
-                  {t.byCount}
-                </button>
-              </div>
-              <div className={`mb-4 transition-opacity duration-200 ${config.distributionMode === 'by-gap' || config.elementType === 'calculated' ? 'opacity-100' : 'opacity-60'}`}>
-                <label className={`text-[10px] font-bold mb-1 block uppercase transition-colors ${config.distributionMode === 'by-gap' || config.elementType === 'calculated' ? 'text-blue-600' : 'text-slate-500'}`}>{t.targetGap}</label>
-                <input type="number" value={config.targetGap} onChange={(e) => handleTargetGapChange(Number(e.target.value))} className={`${inputClasses} ${config.distributionMode === 'by-gap' || config.elementType === 'calculated' ? 'border-blue-300 ring-2 ring-blue-500/10' : ''}`} />
-              </div>
-              <div className={`transition-opacity duration-200 ${config.distributionMode === 'by-count' || config.elementType === 'calculated' ? 'opacity-100' : 'opacity-60'}`}>
-                <label className={`text-[10px] font-bold mb-1 block uppercase transition-colors ${config.distributionMode === 'by-count' || config.elementType === 'calculated' ? 'text-blue-600' : 'text-slate-500'}`}>{t.elementCount}</label>
-                <div className="flex gap-1 items-center">
-                  <button onClick={() => handleAdjustCount(-1)} className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 active:bg-slate-200 transition-colors shadow-sm"><Minus className="w-4 h-4" /></button>
-                  <input type="number" value={config.elementCount} onChange={(e) => handleElementCountChange(Number(e.target.value))} className={`flex-1 min-w-0 bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-center font-bold text-sm text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${config.distributionMode === 'by-count' || config.elementType === 'calculated' ? 'border-blue-300 ring-2 ring-blue-500/10' : ''}`} />
-                  <button onClick={() => handleAdjustCount(1)} className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 active:bg-slate-200 transition-colors shadow-sm"><Plus className="w-4 h-4" /></button>
-                </div>
-              </div>
-            </section>
-
-            <section className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="font-bold text-slate-800 text-[10px] uppercase tracking-widest flex items-center gap-2"><Maximize2 className="w-3 h-3 text-blue-500" /> {t.maxEndGap}</h2>
-                <button 
-                  onClick={handleToggleMaxEndGapLock} 
-                  className={`text-[9px] font-black uppercase px-2 py-1 rounded-md transition-colors flex items-center gap-1.5 ${config.isMaxEndGapLocked ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
-                >
-                  {config.isMaxEndGapLocked ? <Lock className="w-2.5 h-2.5" /> : <Unlock className="w-2.5 h-2.5" />}
-                  {t.syncTarget}
-                </button>
-              </div>
-              <input 
-                type="number" 
-                value={config.isMaxEndGapLocked ? config.targetGap : config.maxEndGap} 
-                onChange={(e) => updateConfig({ maxEndGap: Number(e.target.value) })} 
-                className={`${inputClasses} ${config.isMaxEndGapLocked ? 'bg-blue-50/50 border-blue-200 text-blue-800' : ''}`} 
-              />
-              {config.isMaxEndGapLocked && (
-                <p className="text-[9px] text-blue-500 font-bold italic mt-1 leading-tight tracking-tight uppercase">{t.syncActive}</p>
-              )}
-            </section>
           </div>
 
-          <div className="lg:col-span-8 space-y-4" id="export-container">
-            <div className="flex items-center justify-between no-print px-1">
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.calcResults}</div>
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={handleShare} 
-                  className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold shadow-sm hover:bg-slate-50 transition-colors active:scale-95" 
-                  title={t.link}
-                >
-                  <Share2 className="w-3.5 h-3.5" />
-                  <span>{t.link}</span>
-                </button>
-                <button 
-                  onClick={handleExportImage} 
-                  disabled={isExporting} 
-                  className={`${isExporting ? 'bg-slate-400' : 'bg-blue-600 hover:bg-blue-700'} text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-2 transition-colors active:scale-95`}
-                >
-                  <ImageIcon className="w-3.5 h-3.5" />
-                  <span>{isExporting ? t.creating : t.toImage}</span>
-                </button>
-              </div>
-            </div>
-
-            {result.warnings.length > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 shadow-sm flex gap-3 no-print">
-                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
-                <div className="text-xs text-amber-800 font-bold uppercase leading-tight">
-                  {result.warnings.map((w, idx) => <div key={idx}>{w}</div>)}
-                </div>
-              </div>
-            )}
-            
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {/* Results Column */}
+          <div className="lg:col-span-7 space-y-6" id="export-container">
+            {/* Results Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                <StatBox label={t.platformDist} value={`${Math.round(result.edgeToEdge)}`} unit={t.mm} />
                <StatBox label={t.elements} value={`${result.elementCount}`} unit={t.pcs} />
                <StatBox label={t.betweenElements} value={`${Math.round(result.actualGap)}`} unit={t.mm} highlight />
                <StatBox label={t.firstOffset} value={`${Math.round(result.firstElementOffset)}`} unit={t.mm} />
             </div>
+
+            {/* Warnings */}
+            {result.warnings.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm flex gap-4 no-print">
+                <div className="bg-amber-100 p-1.5 rounded-lg h-fit"><AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" /></div>
+                <div className="text-[11px] text-amber-900 font-bold uppercase leading-tight tracking-tight">
+                  {result.warnings.map((w, idx) => <div key={idx} className="mb-1">• {w}</div>)}
+                </div>
+              </div>
+            )}
             
-            <MainDiagram config={config} result={result} lang={lang} />
-            <ConstructionRuler config={config} result={result} lang={lang} />
+            <div className="space-y-6">
+              <MainDiagram config={config} result={result} lang={lang} />
+              <ConstructionRuler config={config} result={result} lang={lang} />
+            </div>
           </div>
         </div>
       </main>
       
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 sm:hidden flex justify-between items-center z-50 no-print shadow-[0_-4px_15px_rgba(0,0,0,0.05)]">
+      {/* Mobile Sticky Summary */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 p-4 sm:hidden flex justify-between items-center z-50 no-print shadow-[0_-8px_30px_rgba(0,0,0,0.08)]">
          <div className="flex flex-col">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{t.stepBetween}</span>
+            <span className="text-[10px] text-slate-400 font-black uppercase tracking-tight">{t.stepBetween}</span>
             <span className="text-xl font-black text-blue-600 leading-none">{Math.round(result.actualGap)} {t.mm}</span>
          </div>
-         <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="bg-slate-900 text-white p-3 rounded-xl shadow-lg active:scale-90 transition-transform"><Settings2 className="w-5 h-5" /></button>
+         <button 
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} 
+          className="bg-blue-600 text-white p-3.5 rounded-2xl shadow-xl shadow-blue-200 active:scale-90 transition-transform"
+         >
+          <Settings2 className="w-5 h-5" />
+         </button>
       </div>
     </div>
   );
 };
 
 const StatBox = ({ label, value, unit, highlight = false }: { label: string, value: string, unit?: string, highlight?: boolean }) => (
-  <div className={`bg-white p-3 rounded-xl shadow-sm border border-slate-200 text-center ${highlight ? 'ring-2 ring-blue-500/20' : ''}`}>
-    <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5 tracking-tighter">{label}</p>
-    <p className={`text-base font-black ${highlight ? 'text-blue-600' : 'text-slate-800'}`}>{value}<span className="text-[10px] ml-0.5 font-normal text-slate-400">{unit}</span></p>
+  <div className={`bg-white p-4 rounded-2xl shadow-sm border ${highlight ? 'border-blue-200 bg-blue-50/20' : 'border-slate-200'} text-center transition-all`}>
+    <p className="text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest leading-none">{label}</p>
+    <div className="flex items-baseline justify-center gap-0.5">
+      <span className={`text-lg font-black ${highlight ? 'text-blue-600' : 'text-slate-800'}`}>{value}</span>
+      <span className="text-[10px] font-bold text-slate-400 uppercase">{unit}</span>
+    </div>
   </div>
 );
 

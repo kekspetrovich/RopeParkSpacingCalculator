@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { AppConfig, CalculationResult } from '../types';
 import { formatMm } from '../utils/calculations';
-import { Copy } from 'lucide-react';
+// Fix: Use correct PascalCase for StretchHorizontal icon import
+import { Copy, List, StretchHorizontal as Stretch } from 'lucide-react';
 
 interface ConstructionRulerProps {
   config: AppConfig;
@@ -15,21 +16,28 @@ const LABELS = {
     ruler: 'Линейка разметки',
     platform: 'Платформа',
     element: 'Элемент',
-    sequence: 'Последовательность разметки (нажми, чтобы скопировать):',
+    sequence: 'Последовательность разметки:',
     edge: 'Край платформы',
-    copied: 'Последовательность скопирована!'
+    copied: 'Последовательность скопирована!',
+    hint: '(нажми, чтобы скопировать)',
+    column: 'Столбик',
+    row: 'Строка'
   },
   en: {
     ruler: 'Marking Ruler',
     platform: 'Platform',
     element: 'Element',
-    sequence: 'Marking Sequence (click to copy):',
+    sequence: 'Marking Sequence:',
     edge: 'Platform Edge',
-    copied: 'Sequence copied!'
+    copied: 'Sequence copied!',
+    hint: '(click to copy)',
+    column: 'Column',
+    row: 'Row'
   }
 };
 
 export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, result, lang }) => {
+  const [viewMode, setViewMode] = useState<'column' | 'row'>('column');
   const { elementPositions, edgeToEdge } = result;
   const { elementType, boardWidth } = config;
   const t = LABELS[lang];
@@ -47,13 +55,13 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
   const hasWidth = elementType !== 'point';
 
   const sequence = [
-    `[${t.edge}]`,
-    ...elementPositions.map(pos => `[${formatMm(pos)}]`),
-    `[${formatMm(edgeToEdge)}]`,
-    `[${t.edge}]`
+    `0 (${t.edge})`,
+    ...elementPositions.map(pos => formatMm(pos)),
+    `${formatMm(edgeToEdge)} (${t.edge})`
   ];
 
-  const fullSequenceText = sequence.join('');
+  const separator = ' | ';
+  const fullSequenceText = viewMode === 'column' ? sequence.join('\n') : sequence.join(separator);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(fullSequenceText);
@@ -67,7 +75,7 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
     <div className="w-full bg-white rounded-xl shadow-sm border border-slate-200 p-4">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.ruler} (мм)</h3>
-        <div className="flex gap-4 text-[9px] font-bold uppercase">
+        <div className="flex gap-4 text-[9px] font-bold uppercase text-slate-500">
           <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-blue-500 rounded-full"></div> {t.platform}</span>
           <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-red-600 rounded-sm"></div> {t.element}</span>
         </div>
@@ -135,15 +143,44 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
       </div>
       
       <div className="mt-4 pt-4 border-t border-slate-100">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-2">{t.sequence}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+          <div className="flex flex-col">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter leading-none">{t.sequence}</p>
+            <span className="text-[9px] text-slate-300 font-medium uppercase mt-0.5">{t.hint}</span>
+          </div>
+          <div className="flex bg-slate-100 p-1 rounded-lg self-start">
+            <button 
+              onClick={() => setViewMode('column')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase transition-all ${viewMode === 'column' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <List className="w-3 h-3" />
+              {t.column}
+            </button>
+            <button 
+              onClick={() => setViewMode('row')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase transition-all ${viewMode === 'row' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Stretch className="w-3 h-3 rotate-90" />
+              {t.row}
+            </button>
+          </div>
+        </div>
+
         <button 
           onClick={handleCopy}
-          className="w-full text-left bg-slate-50 border border-slate-200 p-3 rounded-lg text-[11px] font-black text-slate-800 hover:bg-slate-100 hover:border-slate-300 transition-all active:scale-[0.99] flex justify-between items-start group"
+          className="w-full text-left bg-slate-50 border border-slate-200 p-3 rounded-xl text-[11px] font-normal text-slate-800 hover:bg-slate-100 hover:border-slate-300 transition-all active:scale-[0.99] flex justify-between items-start group max-h-64 overflow-y-auto"
         >
-          <span className="break-all leading-relaxed">
-            {fullSequenceText}
-          </span>
-          <Copy className="w-4 h-4 text-slate-400 group-hover:text-blue-500 shrink-0 ml-2 mt-0.5" />
+          <div className={`flex ${viewMode === 'column' ? 'flex-col gap-1.5' : 'flex-row flex-wrap gap-x-1.5 gap-y-1'} leading-tight`}>
+            {sequence.map((item, idx) => (
+              <React.Fragment key={idx}>
+                <span className="block">{item}</span>
+                {viewMode === 'row' && idx < sequence.length - 1 && (
+                  <span className="text-slate-300 font-bold select-none">{separator.trim()}</span>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+          <Copy className="w-4 h-4 text-slate-400 group-hover:text-blue-500 shrink-0 ml-2 mt-0.5 sticky top-0" />
         </button>
       </div>
     </div>

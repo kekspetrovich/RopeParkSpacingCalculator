@@ -1,9 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
-import QRCode from 'https://esm.sh/qrcode';
+import React from 'react';
 import { AppConfig, CalculationResult } from '../types';
 import { formatMm } from '../utils/calculations';
-import { serializeConfig } from '../utils/serialization';
 
 interface MainDiagramProps {
   config: AppConfig;
@@ -17,16 +15,14 @@ const LABELS = {
     offset: 'Отступ',
     width: 'Ширина',
     total: 'Всего',
-    diagram: 'Схема',
-    scan: 'Сканируй для перехода'
+    diagram: 'Схема'
   },
   en: {
     step: 'Step',
     offset: 'Offset',
     width: 'Width',
     total: 'Total',
-    diagram: 'Diagram',
-    scan: 'Scan to open'
+    diagram: 'Diagram'
   }
 };
 
@@ -34,29 +30,6 @@ export const MainDiagram: React.FC<MainDiagramProps> = ({ config, result, lang }
   const { elementType, boardWidth } = config;
   const { edgeToEdge, elementPositions, firstElementOffset, actualGap } = result;
   const t = LABELS[lang];
-
-  const [qrUrl, setQrUrl] = useState<string>('');
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const baseUrl = 'https://kekspetrovich.github.io/RopeParkSpacingCalculator/';
-      const encodedConfig = serializeConfig(config);
-      const fullUrl = `${baseUrl}#${encodedConfig}`;
-      
-      QRCode.toDataURL(fullUrl, {
-        margin: 1,
-        width: 240, 
-        color: {
-          dark: '#0f172a',
-          light: '#ffffff'
-        },
-        errorCorrectionLevel: 'M'
-      })
-      .then(url => setQrUrl(url))
-      .catch(err => console.error('QR Generation failed', err));
-    }, 150); 
-    return () => clearTimeout(timer);
-  }, [config]);
 
   // --- SVG КООРДИНАТЫ (0-1000 x 0-500) ---
   const viewWidth = 1000;
@@ -199,17 +172,6 @@ export const MainDiagram: React.FC<MainDiagramProps> = ({ config, result, lang }
               true
             )}
           </g>
-
-          {/* QR-код отрисовываем в самом конце, чтобы он был поверх всех остальных элементов */}
-          {qrUrl && (
-            <g transform={`translate(${viewWidth - 210}, 5)`}>
-              <rect x="0" y="0" width="200" height="200" fill="white" rx="8" shadow="0 4px 6px -1px rgb(0 0 0 / 0.1)" />
-              <image href={qrUrl} x="5" y="5" width="190" height="190" />
-              <text x="100" y="215" textAnchor="middle" className="text-[12px] font-black fill-slate-400 uppercase tracking-tighter" style={{ paintOrder: 'stroke', stroke: 'white', strokeWidth: '2px' }}>
-                {t.scan}
-              </text>
-            </g>
-          )}
         </svg>
       </div>
     </div>
