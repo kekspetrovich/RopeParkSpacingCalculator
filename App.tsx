@@ -73,8 +73,6 @@ const App: React.FC = () => {
   const updateConfig = (updates: Partial<AppConfig>) => {
     setConfig(prev => {
       const next = { ...prev, ...updates };
-      // If user manually types a value into maxEndGap, we unlock the mode.
-      // We check if maxEndGap is being updated WITHOUT explicitly toggling the lock in the same call.
       if (updates.maxEndGap !== undefined && updates.isMaxEndGapLocked === undefined) {
         next.isMaxEndGapLocked = false;
       }
@@ -165,24 +163,15 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-20 sm:pb-4 bg-slate-50">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 no-print shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <LayoutGrid className="text-blue-600 w-5 h-5" />
-            <h1 className="text-base font-bold text-slate-800">Разметка</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={handleShare} className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg" title="Поделиться ссылкой"><Share2 className="w-4 h-4" /></button>
-            <button onClick={handleExportImage} disabled={isExporting} className={`${isExporting ? 'bg-slate-400' : 'bg-blue-600 hover:bg-blue-700'} text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm flex items-center gap-2 transition-colors active:scale-95`}>
-              <ImageIcon className="w-4 h-4" /> <span>{isExporting ? 'Создание...' : 'В картинку'}</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 py-4">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <main className="max-w-7xl mx-auto px-4 py-4 lg:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column: Inputs */}
           <div className="lg:col-span-4 space-y-4 no-print">
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <LayoutGrid className="text-blue-600 w-5 h-5" />
+              <h1 className="text-lg font-black text-slate-800 uppercase tracking-tight">Разметка</h1>
+            </div>
+
             <section className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
               <h2 className="font-bold text-slate-800 text-[10px] uppercase tracking-widest mb-3 flex items-center gap-2"><Circle className="w-3 h-3 text-blue-500" /> Платформа</h2>
               <div className="grid grid-cols-3 gap-2 mb-2">
@@ -278,7 +267,31 @@ const App: React.FC = () => {
             </section>
           </div>
 
+          {/* Right Column: Visualization & Results */}
           <div className="lg:col-span-8 space-y-4" id="export-container">
+            {/* Actions Toolbar */}
+            <div className="flex items-center justify-between no-print px-1">
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Результаты расчета</div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={handleShare} 
+                  className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold shadow-sm hover:bg-slate-50 transition-colors active:scale-95" 
+                  title="Поделиться ссылкой"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Ссылка</span>
+                </button>
+                <button 
+                  onClick={handleExportImage} 
+                  disabled={isExporting} 
+                  className={`${isExporting ? 'bg-slate-400' : 'bg-blue-600 hover:bg-blue-700'} text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-2 transition-colors active:scale-95`}
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span>{isExporting ? 'Создание...' : 'В картинку'}</span>
+                </button>
+              </div>
+            </div>
+
             {result.warnings.length > 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 shadow-sm flex gap-3 no-print">
                 <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
@@ -287,18 +300,21 @@ const App: React.FC = () => {
                 </div>
               </div>
             )}
+            
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                <StatBox label="Раб. зона" value={`${Math.round(result.edgeToEdge)}`} unit="мм" />
                <StatBox label="Элементов" value={`${result.elementCount}`} unit="шт" />
                <StatBox label="Между элементами" value={`${Math.round(result.actualGap)}`} unit="мм" highlight />
                <StatBox label="1-й отступ" value={`${Math.round(result.firstElementOffset)}`} unit="мм" />
             </div>
+            
             <MainDiagram config={config} result={result} />
             <ConstructionRuler config={config} result={result} />
           </div>
         </div>
       </main>
       
+      {/* Mobile Toolbar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 sm:hidden flex justify-between items-center z-50 no-print shadow-[0_-4px_15px_rgba(0,0,0,0.05)]">
          <div className="flex flex-col">
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Шаг между элементами</span>
