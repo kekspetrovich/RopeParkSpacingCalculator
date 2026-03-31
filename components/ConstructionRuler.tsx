@@ -41,9 +41,9 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
   const { elementType, boardWidth } = config;
   const t = LABELS[lang];
 
-  const margin = 30; // Reduced margin
+  const margin = 50;
   const viewWidth = 1000;
-  const viewHeight = 150; // Reduced height
+  const viewHeight = 180;
   const usableWidth = viewWidth - (margin * 2);
 
   const getX = (pos: number) => {
@@ -67,16 +67,17 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
     alert(t.copied);
   };
 
-  const rulerY = viewHeight - 30;
+  const rulerY = viewHeight - 40;
   const tickThickness = 1.5;
 
   return (
-    <div className="w-full bg-white rounded-xl shadow-sm border border-slate-200 p-2 sm:p-4">
-      <div className="flex items-center justify-between mb-1">
-        <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.ruler} (мм)</h3>
-        <div className="flex gap-2 text-[8px] font-normal uppercase text-slate-400">
-          <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> {t.platform}</span>
-          <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 bg-red-600 rounded-sm"></div> {t.element}</span>
+    <div className="w-full bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+      <div className="flex items-center justify-between mb-2">
+        {/* Заголовок возвращен к исходному стилю (10px font-black) */}
+        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.ruler} (мм)</h3>
+        <div className="flex gap-4 text-[9px] font-normal uppercase text-slate-400">
+          <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-blue-500 rounded-full"></div> {t.platform}</span>
+          <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-red-600 rounded-sm"></div> {t.element}</span>
         </div>
       </div>
 
@@ -96,18 +97,18 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
           />
 
           <g>
-            <line x1={margin} y1={rulerY - 20} x2={margin} y2={rulerY} stroke="#2563eb" strokeWidth={tickThickness} />
-            <text x={margin} y={rulerY + 20} textAnchor="middle" className="text-[14px] font-normal" fill="#1d4ed8">0</text>
+            <line x1={margin} y1={rulerY - 25} x2={margin} y2={rulerY} stroke="#2563eb" strokeWidth={tickThickness} />
+            <text x={margin} y={rulerY + 25} textAnchor="middle" className="text-[14px] font-normal" fill="#1d4ed8">0</text>
           </g>
 
           {elementPositions.map((pos, idx) => {
             const x = getX(pos);
             const isHighDensity = elementPositions.length > 20;
-            const labelY = rulerY - 25;
+            const labelY = rulerY - 35; // Смещение вверх для вертикального текста
             
             return (
               <g key={idx}>
-                <line x1={x} y1={rulerY - 25} x2={x} y2={rulerY} stroke="#dc2626" strokeWidth={tickThickness} />
+                <line x1={x} y1={rulerY - 30} x2={x} y2={rulerY} stroke="#dc2626" strokeWidth={tickThickness} />
                 
                 {hasWidth && (
                   <line 
@@ -124,9 +125,9 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
                   x={x} 
                   y={labelY} 
                   textAnchor="start" 
-                  className={`${isHighDensity ? 'text-[11px]' : 'text-[16px]'} font-normal`}
+                  className={`${isHighDensity ? 'text-[9px]' : 'text-[12px]'} font-normal`} // Увеличен размер шрифта меток
                   fill="#0f172a"
-                  transform={`rotate(-90, ${x}, ${labelY})`}
+                  transform={`rotate(-60, ${x}, ${labelY})`} // Поворот до 60 градусов
                 >
                   {formatMm(pos)}
                 </text>
@@ -135,30 +136,31 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
           })}
 
           <g>
-            <line x1={margin + usableWidth} y1={rulerY - 20} x2={margin + usableWidth} y2={rulerY} stroke="#2563eb" strokeWidth={tickThickness} />
-            <text x={margin + usableWidth} y={rulerY + 20} textAnchor="middle" className="text-[14px] font-normal" fill="#1d4ed8">{formatMm(edgeToEdge)}</text>
+            <line x1={margin + usableWidth} y1={rulerY - 25} x2={margin + usableWidth} y2={rulerY} stroke="#2563eb" strokeWidth={tickThickness} />
+            <text x={margin + usableWidth} y={rulerY + 25} textAnchor="middle" className="text-[14px] font-normal" fill="#1d4ed8">{formatMm(edgeToEdge)}</text>
           </g>
         </svg>
       </div>
       
-      <div className="mt-2 pt-2 border-t border-slate-100">
-        <div className="flex items-center justify-between gap-2 mb-2">
+      <div className="mt-4 pt-4 border-t border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
           <div className="flex flex-col">
-            <p className="text-[9px] font-normal text-slate-400 uppercase tracking-tighter leading-none">{t.sequence}</p>
+            <p className="text-[10px] font-normal text-slate-400 uppercase tracking-tighter leading-none">{t.sequence}</p>
+            <span className="text-[9px] text-slate-300 font-medium uppercase mt-0.5">{t.hint}</span>
           </div>
-          <div className="flex bg-slate-100 p-0.5 rounded-lg">
+          <div className="flex bg-slate-100 p-1 rounded-lg self-start">
             <button 
               onClick={() => setViewMode('column')}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-bold uppercase transition-all ${viewMode === 'column' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-normal uppercase transition-all ${viewMode === 'column' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              <List className="w-2.5 h-2.5" />
+              <List className="w-3 h-3" />
               {t.column}
             </button>
             <button 
               onClick={() => setViewMode('row')}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-bold uppercase transition-all ${viewMode === 'row' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-normal uppercase transition-all ${viewMode === 'row' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              <Stretch className="w-2.5 h-2.5 rotate-90" />
+              <Stretch className="w-3 h-3 rotate-90" />
               {t.row}
             </button>
           </div>
@@ -166,9 +168,9 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
 
         <button 
           onClick={handleCopy}
-          className="w-full text-left bg-slate-50 border border-slate-200 p-2 rounded-lg text-[10px] font-medium text-slate-800 hover:bg-slate-100 transition-all active:scale-[0.99] flex justify-between items-start group max-h-40 overflow-y-auto"
+          className="w-full text-left bg-slate-50 border border-slate-200 p-3 rounded-xl text-[11px] font-normal text-slate-800 hover:bg-slate-100 hover:border-slate-300 transition-all active:scale-[0.99] flex justify-between items-start group max-h-64 overflow-y-auto"
         >
-          <div className={`flex ${viewMode === 'column' ? 'flex-col gap-1' : 'flex-row flex-wrap gap-x-1 gap-y-0.5'} leading-tight`}>
+          <div className={`flex ${viewMode === 'column' ? 'flex-col gap-1.5' : 'flex-row flex-wrap gap-x-1.5 gap-y-1'} leading-tight`}>
             {sequence.map((item, idx) => (
               <React.Fragment key={idx}>
                 <span className="block">{item}</span>
@@ -178,7 +180,7 @@ export const ConstructionRuler: React.FC<ConstructionRulerProps> = ({ config, re
               </React.Fragment>
             ))}
           </div>
-          <Copy className="w-3 h-3 text-slate-400 group-hover:text-blue-500 shrink-0 ml-2 mt-0.5 sticky top-0" />
+          <Copy className="w-4 h-4 text-slate-400 group-hover:text-blue-500 shrink-0 ml-2 mt-0.5 sticky top-0" />
         </button>
       </div>
     </div>
