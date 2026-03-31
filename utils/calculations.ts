@@ -12,14 +12,18 @@ export const calculateLayout = (config: AppConfig): CalculationResult => {
     targetGap,
     elementCount: manualCount,
     maxEndGap,
-    isMaxEndGapLocked
+    firstOffsetMode
   } = config;
 
   const D = diameter;
   const V = distanceValue;
-  // 'calculated' uses boardWidth which is managed by state logic
   const W = elementType === 'point' ? 0 : boardWidth;
-  const M = maxEndGap;
+  const M = firstOffsetMode === 'two-thirds' ? Math.round(targetGap * 2 / 3) : 
+            firstOffsetMode === 'sync' ? targetGap : 
+            maxEndGap;
+
+  const isFirstOffsetFixed = firstOffsetMode === 'fix';
+  const isMaxEndGapLocked = firstOffsetMode === 'sync' || firstOffsetMode === 'two-thirds';
 
   let S: number; // Edge-to-edge distance
   let L: number; // Center-to-center distance
@@ -47,15 +51,28 @@ export const calculateLayout = (config: AppConfig): CalculationResult => {
   let actualG_inner = 0;
 
   if (S > 0 && N > 0) {
-    // Try uniform distribution first
     const Gu = (S - N * W) / (N + 1);
     
-    // For calculated mode, we strictly follow the boardWidth derived in the UI
     if (elementType === 'calculated') {
-      actualG_edge = targetGap;
-      actualG_inner = targetGap;
+      // Если включен фиксированный отступ, крайние промежутки равны M, внутренние — targetGap
+      if (isFirstOffsetFixed) {
+        actualG_edge = M;
+        actualG_inner = targetGap;
+      } else {
+        actualG_edge = targetGap;
+        actualG_inner = targetGap;
+      }
+    } else if (isFirstOffsetFixed) {
+      // Режим фиксированного отступа: первый отступ всегда равен M
+      actualG_edge = M;
+      if (N > 1) {
+        actualG_inner = (S - 2 * M - N * W) / (N - 1);
+      } else {
+        // Если только один элемент, ставим его по центру
+        actualG_edge = (S - W) / 2;
+        actualG_inner = 0;
+      }
     } else if (isMaxEndGapLocked || Gu <= M + 0.1) {
-      // If locked, we always use the uniform gap, ignoring the cap M
       actualG_edge = Gu;
       actualG_inner = Gu;
     } else {
@@ -73,7 +90,7 @@ export const calculateLayout = (config: AppConfig): CalculationResult => {
     warnings.push('Элементы не помещаются');
   }
   
-  if (!isMaxEndGapLocked && elementType !== 'calculated' && actualG_edge > M + 0.5) {
+  if (!isFirstOffsetFixed && !isMaxEndGapLocked && elementType !== 'calculated' && actualG_edge > M + 0.5) {
     warnings.push(`1-й отступ (${Math.round(actualG_edge)} мм) превышает макс. отступ (${M} мм)`);
   }
 

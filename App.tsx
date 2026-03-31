@@ -2,9 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Circle, 
-  ArrowLeftRight, 
   Box, 
-  LayoutGrid, 
   AlertTriangle, 
   Settings2, 
   Image as ImageIcon, 
@@ -15,9 +13,10 @@ import {
   Lock,
   Unlock,
   Languages,
-  Ruler
+  Ruler,
+  Anchor
 } from 'lucide-react';
-import { AppConfig, ElementType, DistanceMode, DistributionMode, RulerMarkMode } from './types';
+import { AppConfig, ElementType, DistanceMode } from './types';
 import { calculateLayout, formatMm } from './utils/calculations';
 import { serializeConfig, deserializeConfig } from './utils/serialization';
 import { MainDiagram } from './components/MainDiagram';
@@ -35,7 +34,7 @@ const INITIAL_STATE: AppConfig = {
   targetGap: 400,
   elementCount: 5,
   maxEndGap: 300,
-  isMaxEndGapLocked: false,
+  firstOffsetMode: 'manual',
   rulerMarkMode: 'edge',
 };
 
@@ -58,9 +57,9 @@ const TRANSLATIONS = {
     byCount: 'По количеству',
     targetGap: 'Желаемый отступ (мм)',
     elementCount: 'Количество',
-    maxEndGap: 'MAX 1-й отступ (мм)',
-    syncTarget: 'Как желаемый отступ',
-    syncActive: 'Синхронизация активна',
+    maxEndGap: 'MAX/Фикс 1-й отступ (мм)',
+    syncTarget: 'Синхр.',
+    fixOffset: 'Фикс.',
     calcResults: 'Результаты',
     link: 'Ссылка',
     toImage: 'В картинку',
@@ -92,9 +91,9 @@ const TRANSLATIONS = {
     byCount: 'By Count',
     targetGap: 'Target Gap (mm)',
     elementCount: 'Count',
-    maxEndGap: 'MAX 1st Gap (mm)',
-    syncTarget: 'Sync with Gap',
-    syncActive: 'Sync active',
+    maxEndGap: 'MAX/FIX 1st Gap (mm)',
+    syncTarget: 'Sync',
+    fixOffset: 'Fix',
     calcResults: 'Results',
     link: 'Link',
     toImage: 'To Image',
@@ -124,19 +123,23 @@ const App: React.FC = () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) base = { ...base, ...JSON.parse(saved) };
-    } catch (e) {}
+    } catch {
+      // Ignore errors
+    }
 
     try {
       const hash = window.location.hash.substring(1);
       if (hash) {
-        if (hash.startsWith('v2_') || hash.startsWith('v3_')) {
+        if (hash.startsWith('v2_') || hash.startsWith('v3_') || hash.startsWith('v4_')) {
           const deserialized = deserializeConfig(hash);
           if (deserialized) return { ...base, ...deserialized };
         } else {
           return { ...base, ...JSON.parse(decodeURIComponent(hash)) };
         }
       }
-    } catch (e) {}
+    } catch {
+      // Ignore errors
+    }
     return base;
   });
 
@@ -161,29 +164,36 @@ const App: React.FC = () => {
       if (window.location.hash !== newHash) {
         window.history.replaceState(null, '', newHash);
       }
-    } catch (e) {}
+    } catch {
+      // Ignore errors
+    }
   }, [config, result.elementCount]);
+
+  const deriveWidth = (S: number, G: number, N: number, M: number, isFixed: boolean) => {
+    if (N <= 0) return 0;
+    // S = N*W + 2*EdgeGap + (N-1)*InnerGap
+    const edgeGap = isFixed ? M : G;
+    const innerGap = G;
+    const W = (S - 2 * edgeGap - (N - 1) * innerGap) / N;
+    return Math.max(0, Math.round(W));
+  };
 
   const updateConfig = (updates: Partial<AppConfig>) => {
     setConfig(prev => {
       const next = { ...prev, ...updates };
-      if (updates.maxEndGap !== undefined && updates.isMaxEndGapLocked === undefined) {
-        next.isMaxEndGapLocked = false;
+      // Если меняется maxEndGap вручную, переключаем в ручной режим
+      if (updates.maxEndGap !== undefined && updates.firstOffsetMode === undefined) {
+        next.firstOffsetMode = 'manual';
       }
       return next;
     });
   };
 
-  const deriveWidth = (S: number, G: number, N: number) => {
-    if (N <= 0) return 0;
-    const W = (S - (N + 1) * G) / N;
-    return Math.max(0, Math.round(W));
-  };
-
   const handleDiameterChange = (d: number) => {
     if (config.elementType === 'calculated') {
       const tempS = config.distanceMode === 'center-to-center' ? config.distanceValue - d : config.distanceValue;
-      const newWidth = deriveWidth(tempS, config.targetGap, config.elementCount);
+      const isFixed = config.firstOffsetMode === 'fix';
+      const newWidth = deriveWidth(tempS, config.targetGap, config.elementCount, config.maxEndGap, isFixed);
       updateConfig({ diameter: d, boardWidth: newWidth });
     } else {
       updateConfig({ diameter: d });
@@ -193,7 +203,8 @@ const App: React.FC = () => {
   const handleDistanceValueChange = (v: number) => {
     if (config.elementType === 'calculated') {
       const tempS = config.distanceMode === 'center-to-center' ? v - config.diameter : v;
-      const newWidth = deriveWidth(tempS, config.targetGap, config.elementCount);
+      const isFixed = config.firstOffsetMode === 'fix';
+      const newWidth = deriveWidth(tempS, config.targetGap, config.elementCount, config.maxEndGap, isFixed);
       updateConfig({ distanceValue: v, boardWidth: newWidth });
     } else {
       updateConfig({ distanceValue: v });
@@ -203,7 +214,8 @@ const App: React.FC = () => {
   const handleDistanceModeChange = (mode: DistanceMode) => {
     if (config.elementType === 'calculated') {
       const tempS = mode === 'center-to-center' ? config.distanceValue - config.diameter : config.distanceValue;
-      const newWidth = deriveWidth(tempS, config.targetGap, config.elementCount);
+      const isFixed = config.firstOffsetMode === 'fix';
+      const newWidth = deriveWidth(tempS, config.targetGap, config.elementCount, config.maxEndGap, isFixed);
       updateConfig({ distanceMode: mode, boardWidth: newWidth });
     } else {
       updateConfig({ distanceMode: mode });
@@ -212,7 +224,8 @@ const App: React.FC = () => {
 
   const handleTargetGapChange = (value: number) => {
     if (config.elementType === 'calculated') {
-      const newWidth = deriveWidth(result.edgeToEdge, value, config.elementCount);
+      const isFixed = config.firstOffsetMode === 'fix';
+      const newWidth = deriveWidth(result.edgeToEdge, value, config.elementCount, config.maxEndGap, isFixed);
       updateConfig({ targetGap: value, boardWidth: newWidth });
     } else {
       updateConfig({ targetGap: value, distributionMode: 'by-gap' });
@@ -222,7 +235,8 @@ const App: React.FC = () => {
   const handleElementCountChange = (value: number) => {
     const newCount = Math.max(0, value);
     if (config.elementType === 'calculated') {
-      const newWidth = deriveWidth(result.edgeToEdge, config.targetGap, newCount);
+      const isFixed = config.firstOffsetMode === 'fix';
+      const newWidth = deriveWidth(result.edgeToEdge, config.targetGap, newCount, config.maxEndGap, isFixed);
       updateConfig({ elementCount: newCount, boardWidth: newWidth });
     } else {
       const tempConfig = { ...config, elementCount: newCount, distributionMode: 'by-count' as const };
@@ -241,23 +255,32 @@ const App: React.FC = () => {
 
   const handleElementTypeChange = (type: ElementType) => {
     if (type === 'calculated') {
-      const newWidth = deriveWidth(result.edgeToEdge, config.targetGap, result.elementCount);
+      const isFixed = config.firstOffsetMode === 'fix';
+      const newWidth = deriveWidth(result.edgeToEdge, config.targetGap, result.elementCount, config.maxEndGap, isFixed);
       updateConfig({ elementType: type, boardWidth: newWidth, distributionMode: 'by-count', elementCount: result.elementCount });
     } else {
       updateConfig({ elementType: type });
     }
   };
 
-  const handleToggleMaxEndGapLock = () => {
-    const isNowLocked = !config.isMaxEndGapLocked;
-    if (isNowLocked) {
-      updateConfig({ 
-        isMaxEndGapLocked: true, 
-        maxEndGap: config.targetGap 
-      });
-    } else {
-      updateConfig({ isMaxEndGapLocked: false });
+  const handleToggleFirstOffsetMode = (mode: FirstOffsetMode) => {
+    const currentMode = config.firstOffsetMode;
+    const nextMode = currentMode === mode ? 'manual' : mode;
+    
+    const updates: Partial<AppConfig> = { firstOffsetMode: nextMode };
+    
+    if (nextMode === 'sync') {
+      updates.maxEndGap = config.targetGap;
+    } else if (nextMode === 'two-thirds') {
+      updates.maxEndGap = Math.round(config.targetGap * 2 / 3);
     }
+    
+    if (config.elementType === 'calculated') {
+      const isFixed = nextMode === 'fix';
+      updates.boardWidth = deriveWidth(result.edgeToEdge, config.targetGap, config.elementCount, updates.maxEndGap ?? config.maxEndGap, isFixed);
+    }
+    
+    updateConfig(updates);
   };
 
   const handleExportImage = async () => {
@@ -266,7 +289,7 @@ const App: React.FC = () => {
     setIsExporting(true);
     try {
       await new Promise(r => setTimeout(r, 200));
-      const canvas = await (window as any).html2canvas(element, { scale: 2, backgroundColor: '#f8fafc', logging: false, useCORS: true });
+      const canvas = await (window as unknown as { html2canvas: (el: HTMLElement, options: object) => Promise<HTMLCanvasElement> }).html2canvas(element, { scale: 2, backgroundColor: '#f8fafc', logging: false, useCORS: true });
       const image = canvas.toDataURL("image/png");
       const link = document.createElement('a');
       link.href = image;
@@ -282,7 +305,6 @@ const App: React.FC = () => {
     alert(lang === 'ru' ? 'Ссылка скопирована!' : 'Link copied!');
   };
 
-  // Стили для инпутов: Обычный шрифт, темный текст, светлый фон
   const inputContainerClasses = "relative bg-slate-50 border border-slate-300 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all";
   const inputBaseClasses = "w-full bg-transparent px-3 py-2 text-base font-normal text-slate-900 outline-none";
   const labelClasses = "block text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-1.5 ml-1";
@@ -308,7 +330,6 @@ const App: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Settings Column */}
           <div className="lg:col-span-5 space-y-6 no-print">
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-6">
               <div className="flex items-center gap-2 mb-2">
@@ -316,7 +337,6 @@ const App: React.FC = () => {
                 <h2 className="text-sm font-normal text-slate-800 uppercase tracking-widest">{t.settings}</h2>
               </div>
 
-              {/* Grouped Controls */}
               <div className="space-y-5">
                 {/* Diameter */}
                 <div>
@@ -356,7 +376,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Element Type Selection - Icons with Labels */}
+                {/* Element Type */}
                 <div>
                   <label className={labelClasses}>{t.elementType}</label>
                   <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-2">
@@ -397,7 +417,7 @@ const App: React.FC = () => {
                   )}
                 </div>
 
-                {/* Distribution: Gap and Count */}
+                {/* Distribution */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className={labelClasses}>{t.targetGap}</label>
@@ -427,34 +447,55 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Max End Gap with Tractor */}
+                {/* Max/Fix End Gap */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <label className="text-[10px] font-normal text-slate-400 uppercase tracking-widest">{t.maxEndGap}</label>
+                    </div>
+                    <div className="flex gap-1.5">
                       <button 
-                        onClick={() => updateConfig({ maxEndGap: 300 })}
-                        className="text-lg hover:scale-125 transition-transform active:scale-90 p-1 bg-amber-50 rounded-lg shadow-sm border border-amber-100 leading-none"
-                        title="300mm"
+                        onClick={() => handleToggleFirstOffsetMode('two-thirds')}
+                        className={`text-[9px] font-normal uppercase px-2 py-1 rounded-lg transition-all ${config.firstOffsetMode === 'two-thirds' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                        title="2/3"
                       >
-                        🚜
+                        2/3
+                      </button>
+                      <button 
+                        onClick={() => handleToggleFirstOffsetMode('sync')} 
+                        className={`text-[9px] font-normal uppercase px-2 py-1 rounded-lg transition-all flex items-center gap-1 ${config.firstOffsetMode === 'sync' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                        title={t.syncTarget}
+                      >
+                        {config.firstOffsetMode === 'sync' ? <Lock className="w-2.5 h-2.5" /> : <Unlock className="w-2.5 h-2.5" />}
+                        {t.syncTarget}
+                      </button>
+                      <button 
+                        onClick={() => handleToggleFirstOffsetMode('fix')} 
+                        className={`text-[9px] font-normal uppercase px-2 py-1 rounded-lg transition-all flex items-center gap-1 ${config.firstOffsetMode === 'fix' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                        title={t.fixOffset}
+                      >
+                        <Anchor className="w-2.5 h-2.5" />
+                        {t.fixOffset}
                       </button>
                     </div>
-                    <button 
-                      onClick={handleToggleMaxEndGapLock} 
-                      className={`text-[9px] font-normal uppercase px-2 py-1 rounded-lg transition-all flex items-center gap-1.5 ${config.isMaxEndGapLocked ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
-                    >
-                      {config.isMaxEndGapLocked ? <Lock className="w-2.5 h-2.5" /> : <Unlock className="w-2.5 h-2.5" />}
-                      {t.syncTarget}
-                    </button>
                   </div>
-                  <div className={`${inputContainerClasses} ${config.isMaxEndGapLocked ? 'bg-slate-100 border-dashed' : ''}`}>
+                  <div className={`${inputContainerClasses} ${config.firstOffsetMode !== 'manual' ? 'bg-slate-100 border-dashed' : ''}`}>
                     <input 
                       type="number" 
-                      value={config.isMaxEndGapLocked ? config.targetGap : config.maxEndGap} 
-                      onChange={(e) => updateConfig({ maxEndGap: Number(e.target.value) })} 
-                      disabled={config.isMaxEndGapLocked}
-                      className={`${inputBaseClasses} ${config.isMaxEndGapLocked ? 'text-slate-400 italic' : ''}`} 
+                      value={config.firstOffsetMode === 'sync' ? config.targetGap : config.firstOffsetMode === 'two-thirds' ? Math.round(config.targetGap * 2 / 3) : config.maxEndGap} 
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (config.elementType === 'calculated') {
+                           // В режиме Авто-подбора ширины при ручном вводе M нужно пересчитать W
+                           const isFixed = config.firstOffsetMode === 'fix';
+                           const newWidth = deriveWidth(result.edgeToEdge, config.targetGap, config.elementCount, val, isFixed);
+                           updateConfig({ maxEndGap: val, boardWidth: newWidth });
+                        } else {
+                           updateConfig({ maxEndGap: val });
+                        }
+                      }} 
+                      disabled={config.firstOffsetMode === 'sync' || config.firstOffsetMode === 'two-thirds'}
+                      className={`${inputBaseClasses} ${config.firstOffsetMode !== 'manual' ? 'text-slate-400 italic' : ''}`} 
                     />
                   </div>
                 </div>
@@ -481,9 +522,7 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Results Column */}
           <div className="lg:col-span-7 space-y-6" id="export-container">
-            {/* Results Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                <StatBox label={t.platformDist} value={`${Math.round(result.edgeToEdge)}`} unit={t.mm} />
                <StatBox label={t.elements} value={`${result.elementCount}`} unit={t.pcs} />
@@ -491,7 +530,6 @@ const App: React.FC = () => {
                <StatBox label={t.firstOffset} value={`${Math.round(result.firstElementOffset)}`} unit={t.mm} />
             </div>
 
-            {/* Warnings */}
             {result.warnings.length > 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm flex gap-4 no-print">
                 <div className="bg-amber-100 p-1.5 rounded-lg h-fit"><AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" /></div>
@@ -509,7 +547,6 @@ const App: React.FC = () => {
         </div>
       </main>
       
-      {/* Mobile Sticky Summary */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 p-4 sm:hidden flex justify-between items-center z-50 no-print shadow-[0_-8px_30px_rgba(0,0,0,0.08)]">
          <div className="flex flex-col">
             <span className="text-[10px] text-slate-400 font-normal uppercase tracking-tight">{t.stepBetween}</span>

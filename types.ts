@@ -4,6 +4,8 @@ export type DistanceMode = 'center-to-center' | 'edge-to-edge';
 export type DistributionMode = 'by-gap' | 'by-count';
 export type RulerMarkMode = 'center' | 'edge';
 
+export type FirstOffsetMode = 'manual' | 'two-thirds' | 'sync' | 'fix';
+
 export interface AppConfig {
   diameter: number;
   distanceMode: DistanceMode;
@@ -14,7 +16,7 @@ export interface AppConfig {
   targetGap: number;
   elementCount: number;
   maxEndGap: number;
-  isMaxEndGapLocked: boolean; // New property to track if maxEndGap should follow actualGap
+  firstOffsetMode: FirstOffsetMode;
   rulerMarkMode: RulerMarkMode;
 }
 
