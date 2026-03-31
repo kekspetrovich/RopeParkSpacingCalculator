@@ -2,9 +2,13 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Строительная разметка</title>
     <link rel="icon" type="image/svg+xml" href="/RopeParkSpacingCalculator/assets/favicon-DkXhE-1c.svg">
+    <link rel="manifest" href="/RopeParkSpacingCalculator/manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -30,7 +34,6 @@
         }
     </style>
 
-<link rel="stylesheet" href="/index.css">
 <script type="importmap">
 {
   "imports": {
@@ -43,10 +46,17 @@
   }
 }
 </script>
-  <script type="module" crossorigin src="/RopeParkSpacingCalculator/assets/index-bR1ILgw1.js"></script>
+  <script type="module" crossorigin src="/RopeParkSpacingCalculator/assets/index-BzQwoPbm.js"></script>
 </head>
 <body>
     <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration failed:', err));
+        });
+      }
+    </script>
     <!-- Явное подключение для Vite -->
 </body>
 </html>
