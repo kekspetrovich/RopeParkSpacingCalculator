@@ -31,40 +31,39 @@ export const MainDiagram: React.FC<MainDiagramProps> = ({ config, result, lang }
   const { edgeToEdge, elementPositions, firstElementOffset, actualGap } = result;
   const t = LABELS[lang];
 
-  // --- SVG КООРДИНАТЫ (0-500 x 0-1000) ---
-  // Повернуто на 90 градусов для мобильных устройств
-  const viewWidth = 500;
-  const viewHeight = 1000;
-  const centerX = 250;
+  // --- SVG КООРДИНАТЫ (0-1000 x 0-500) ---
+  const viewWidth = 1000;
+  const viewHeight = 500;
+  const centerY = 250;
 
-  const sideMargin = 80;
-  const platformHeight = 50; 
+  const sideMargin = 100;
+  const platformWidth = 50; 
   
-  const startY = sideMargin + platformHeight; 
-  const endY = viewHeight - sideMargin - platformHeight; 
+  const startX = sideMargin + platformWidth; 
+  const endX = viewWidth - sideMargin - platformWidth; 
   
-  const usableHeight = endY - startY;
-  const scale = edgeToEdge > 0 ? usableHeight / edgeToEdge : 1;
+  const usableWidth = endX - startX;
+  const scale = edgeToEdge > 0 ? usableWidth / edgeToEdge : 1;
 
-  const platformVisualWidth = 120;
+  const platformVisualHeight = 120;
   const elemVisualWidth = 50;
-  const platformLeft = centerX - platformVisualWidth / 2;
-  const platformRight = centerX + platformVisualWidth / 2;
-  const elemLeft = centerX - elemVisualWidth / 2;
+  const platformTop = centerY - platformVisualHeight / 2;
+  const platformBottom = centerY + platformVisualHeight / 2;
+  const elemTop = centerY - elemVisualWidth / 2;
 
-  const renderDimension = (y1: number, y2: number, x: number, label: string, color: string = "#64748b", isRight = false) => {
-    const midY = (y1 + y2) / 2;
-    const textXOffset = isRight ? 32 : -18;
+  const renderDimension = (x1: number, x2: number, y: number, label: string, color: string = "#64748b", isBelow = false) => {
+    const midX = (x1 + x2) / 2;
+    const textYOffset = isBelow ? 38 : -22;
     
     return (
       <g>
-        <line x1={x} y1={y1} x2={x} y2={y2} stroke={color} strokeWidth="2" />
-        <line x1={x - 10} y1={y1} x2={x + 10} y2={y1} stroke={color} strokeWidth="2" />
-        <line x1={x - 10} y1={y2} x2={x + 10} y2={y2} stroke={color} strokeWidth="2" />
+        <line x1={x1} y1={y} x2={x2} y2={y} stroke={color} strokeWidth="2" />
+        <line x1={x1} y1={y - 10} x2={x1} y2={y + 10} stroke={color} strokeWidth="2" />
+        <line x1={x2} y1={y - 10} x2={x2} y2={y + 10} stroke={color} strokeWidth="2" />
         <text 
-          x={x + textXOffset} 
-          y={midY} 
-          textAnchor={isRight ? "start" : "end"} 
+          x={midX} 
+          y={y + textYOffset} 
+          textAnchor="middle" 
           dominantBaseline="middle"
           className="font-normal" 
           fill={color}
@@ -82,10 +81,10 @@ export const MainDiagram: React.FC<MainDiagramProps> = ({ config, result, lang }
   };
 
   const hasWidth = elementType !== 'point';
-  const xStep = 90;
-  const xOffset = 165;
-  const xWidth = 335;
-  const xTotal = 410;
+  const yStep = 90;
+  const yOffset = 165;
+  const yWidth = 335;
+  const yTotal = 410;
 
   return (
     <div className="w-full h-full bg-white rounded-xl shadow-sm border border-slate-200 p-2 relative overflow-hidden flex flex-col">
@@ -100,75 +99,75 @@ export const MainDiagram: React.FC<MainDiagramProps> = ({ config, result, lang }
           style={{ display: 'block', maxHeight: '100%' }}
         >
           {/* Базовая ось */}
-          <line x1={centerX} y1={0} x2={centerX} y2={viewHeight} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="10,5" />
+          <line x1={0} y1={centerY} x2={viewWidth} y2={centerY} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="10,5" />
           
-          {/* Верхняя платформа */}
+          {/* Левая платформа */}
           <path 
-            d={`M ${platformLeft},${startY - platformHeight} 
-               L ${platformRight},${startY - platformHeight} 
-               A ${platformVisualWidth/2},${platformHeight} 0 0 1 ${centerX},${startY}
-               A ${platformVisualWidth/2},${platformHeight} 0 0 1 ${platformLeft},${startY - platformHeight} Z`} 
+            d={`M ${startX - platformWidth},${platformTop} 
+               L ${startX - platformWidth},${platformBottom} 
+               A ${platformWidth},${platformVisualHeight/2} 0 0 0 ${startX},${centerY}
+               A ${platformWidth},${platformVisualHeight/2} 0 0 0 ${startX - platformWidth},${platformTop} Z`} 
             fill="#f8fafc" 
             stroke="#94a3b8" 
             strokeWidth="3" 
           />
           
-          {/* Нижняя платформа */}
+          {/* Правая платформа */}
           <path 
-            d={`M ${platformLeft},${endY + platformHeight} 
-               L ${platformRight},${endY + platformHeight} 
-               A ${platformVisualWidth/2},${platformHeight} 0 0 0 ${centerX},${endY}
-               A ${platformVisualWidth/2},${platformHeight} 0 0 0 ${platformLeft},${endY + platformHeight} Z`} 
+            d={`M ${endX + platformWidth},${platformTop} 
+               L ${endX + platformWidth},${platformBottom} 
+               A ${platformWidth},${platformVisualHeight/2} 0 0 1 ${endX},${centerY}
+               A ${platformWidth},${platformVisualHeight/2} 0 0 1 ${endX + platformWidth},${platformTop} Z`} 
             fill="#f8fafc" 
             stroke="#94a3b8" 
             strokeWidth="3" 
           />
 
           {/* Центральная линия */}
-          <line x1={centerX} y1={startY} x2={centerX} y2={endY} stroke="#0f172a" strokeWidth="1" strokeDasharray="8,4" />
+          <line x1={startX} y1={centerY} x2={endX} y2={centerY} stroke="#0f172a" strokeWidth="1" strokeDasharray="8,4" />
 
           {/* Элементы разметки */}
           {elementPositions.map((pos, idx) => {
-            const y = startY + (pos * scale);
+            const x = startX + (pos * scale);
             if (elementType === 'point') {
-              return <circle key={idx} cx={centerX} cy={y} r="10" fill="#ef4444" stroke="white" strokeWidth="3" />;
+              return <circle key={idx} cx={x} cy={centerY} r="10" fill="#ef4444" stroke="white" strokeWidth="3" />;
             } else {
-              const height = boardWidth * scale;
-              return <rect key={idx} x={elemLeft} y={y} width={elemVisualWidth} height={height} fill="#ef4444" rx="3" stroke="white" strokeWidth="2" />;
+              const width = boardWidth * scale;
+              return <rect key={idx} x={x} y={elemTop} width={width} height={elemVisualWidth} fill="#ef4444" rx="3" stroke="white" strokeWidth="2" />;
             }
           })}
 
           {/* Размеры */}
           <g>
             {elementPositions.length > 1 && renderDimension(
-              startY + (firstElementOffset + (hasWidth ? boardWidth : 0)) * scale,
-              startY + (firstElementOffset + (hasWidth ? boardWidth : 0) + actualGap) * scale,
-              xStep, 
+              startX + (firstElementOffset + (hasWidth ? boardWidth : 0)) * scale,
+              startX + (firstElementOffset + (hasWidth ? boardWidth : 0) + actualGap) * scale,
+              yStep, 
               `${t.step}: ${formatMm(actualGap)}`,
               "#dc2626"
             )}
 
             {renderDimension(
-              startY, 
-              startY + (firstElementOffset * scale), 
-              xOffset, 
+              startX, 
+              startX + (firstElementOffset * scale), 
+              yOffset, 
               `${t.offset}: ${formatMm(firstElementOffset)}`,
               "#2563eb"
             )}
 
             {hasWidth && elementPositions.length > 0 && renderDimension(
-              startY + (firstElementOffset * scale),
-              startY + ((firstElementOffset + boardWidth) * scale),
-              xWidth,
+              startX + (firstElementOffset * scale),
+              startX + ((firstElementOffset + boardWidth) * scale),
+              yWidth,
               `${t.width}: ${formatMm(boardWidth)}`,
               "#7c3aed",
               true
             )}
 
             {renderDimension(
-              startY, 
-              endY, 
-              xTotal, 
+              startX, 
+              endX, 
+              yTotal, 
               `${t.total}: ${formatMm(edgeToEdge)} мм`,
               "#0f172a",
               true
