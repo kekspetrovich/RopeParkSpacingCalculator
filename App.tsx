@@ -34,6 +34,7 @@ const INITIAL_STATE: AppConfig = {
   targetGap: 400,
   elementCount: 5,
   maxEndGap: 300,
+  fixedTargetGap: false,
   firstOffsetMode: 'manual',
   rulerMarkMode: 'edge',
 };
@@ -130,7 +131,7 @@ const App: React.FC = () => {
     try {
       const hash = window.location.hash.substring(1);
       if (hash) {
-        if (hash.startsWith('v2_') || hash.startsWith('v3_') || hash.startsWith('v4_')) {
+        if (hash.startsWith('v2_') || hash.startsWith('v3_') || hash.startsWith('v4_') || hash.startsWith('v5_') || hash.startsWith('v6_')) {
           const deserialized = deserializeConfig(hash);
           if (deserialized) return { ...base, ...deserialized };
         } else {
@@ -267,7 +268,10 @@ const App: React.FC = () => {
     const currentMode = config.firstOffsetMode;
     const nextMode = currentMode === mode ? 'manual' : mode;
     
-    const updates: Partial<AppConfig> = { firstOffsetMode: nextMode };
+    const updates: Partial<AppConfig> = { 
+      firstOffsetMode: nextMode,
+      fixedTargetGap: false // Deactivate target gap fixation if any end gap mode is selected
+    };
     
     if (nextMode === 'sync') {
       updates.maxEndGap = config.targetGap;
@@ -281,6 +285,14 @@ const App: React.FC = () => {
     }
     
     updateConfig(updates);
+  };
+
+  const handleToggleFixedTargetGap = () => {
+    setConfig(prev => ({
+      ...prev,
+      fixedTargetGap: !prev.fixedTargetGap,
+      firstOffsetMode: prev.fixedTargetGap ? prev.firstOffsetMode : 'manual'
+    }));
   };
 
   const handleExportImage = async () => {
@@ -418,19 +430,28 @@ const App: React.FC = () => {
                 </div>
 
                 {/* Distribution */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelClasses}>{t.targetGap}</label>
-                    <div className={inputContainerClasses}>
-                      <input 
-                        type="number" 
-                        value={config.targetGap} 
-                        onChange={(e) => handleTargetGapChange(Number(e.target.value))} 
-                        className={inputBaseClasses} 
-                      />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5 ml-1">
+                        <label className="text-[10px] font-normal text-slate-400 uppercase tracking-widest">{t.targetGap}</label>
+                        <button 
+                          onClick={handleToggleFixedTargetGap}
+                          className={`text-[9px] font-normal uppercase px-2 py-0.5 rounded-lg transition-all flex items-center gap-1 ${config.fixedTargetGap ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                        >
+                          {config.fixedTargetGap ? <Lock className="w-2.5 h-2.5" /> : <Unlock className="w-2.5 h-2.5" />}
+                          {t.fixOffset}
+                        </button>
+                      </div>
+                      <div className={inputContainerClasses}>
+                        <input 
+                          type="number" 
+                          value={config.targetGap} 
+                          onChange={(e) => handleTargetGapChange(Number(e.target.value))} 
+                          className={inputBaseClasses} 
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div>
+                    <div>
                     <label className={labelClasses}>{t.elementCount}</label>
                     <div className="flex gap-2">
                       <div className={`${inputContainerClasses} flex-1 flex items-center`}>

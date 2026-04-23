@@ -1,5 +1,5 @@
 
-import { AppConfig } from '../types';
+import { AppConfig, FirstOffsetMode } from '../types';
 
 const DIAMETER_MAP: Record<number, number> = { 1200: 0, 1500: 1, 1800: 2 };
 const DIAMETER_REVERSE: Record<number, number> = { 0: 1200, 1: 1500, 2: 1800 };
@@ -11,8 +11,9 @@ export const serializeConfig = (c: AppConfig): string => {
   const db = c.distributionMode === 'by-gap' ? 0 : 1;
   const rm = c.rulerMarkMode === 'edge' ? 0 : 1;
   const fom = c.firstOffsetMode === 'manual' ? 0 : c.firstOffsetMode === 'two-thirds' ? 1 : c.firstOffsetMode === 'sync' ? 2 : 3;
+  const ftg = c.fixedTargetGap ? 1 : 0;
   
-  return `v5_${diam}_${dm}_${c.distanceValue}_${et}_${c.boardWidth}_${db}_${c.targetGap}_${c.elementCount}_${c.maxEndGap}_${rm}_${fom}`;
+  return `v6_${diam}_${dm}_${c.distanceValue}_${et}_${c.boardWidth}_${db}_${c.targetGap}_${c.elementCount}_${c.maxEndGap}_${rm}_${fom}_${ftg}`;
 };
 
 export const deserializeConfig = (s: string): Partial<AppConfig> | null => {
@@ -22,6 +23,25 @@ export const deserializeConfig = (s: string): Partial<AppConfig> | null => {
     const n = Number(val);
     return isNaN(n) ? fallback : n;
   };
+
+  if (s.startsWith('v6_')) {
+    const parts = s.split('_');
+    const fomMap: Record<string, FirstOffsetMode> = { '0': 'manual', '1': 'two-thirds', '2': 'sync', '3': 'fix' };
+    return {
+      diameter: DIAMETER_REVERSE[getNum(parts[1], 1)] ?? 1500,
+      distanceMode: parts[2] === '0' ? 'center-to-center' : 'edge-to-edge',
+      distanceValue: getNum(parts[3], 12000),
+      elementType: parts[4] === '0' ? 'point' : parts[4] === '1' ? 'board' : 'calculated',
+      boardWidth: getNum(parts[5], 145),
+      distributionMode: parts[6] === '0' ? 'by-gap' : 'by-count',
+      targetGap: getNum(parts[7], 400),
+      elementCount: getNum(parts[8], 5),
+      maxEndGap: getNum(parts[9], 300),
+      rulerMarkMode: parts[10] === '0' ? 'edge' : 'center',
+      firstOffsetMode: fomMap[parts[11]] ?? 'manual',
+      fixedTargetGap: parts[12] === '1',
+    };
+  }
 
   if (s.startsWith('v5_')) {
     const parts = s.split('_');

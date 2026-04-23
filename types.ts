@@ -16,6 +16,7 @@ export interface AppConfig {
   targetGap: number;
   elementCount: number;
   maxEndGap: number;
+  fixedTargetGap: boolean;
   firstOffsetMode: FirstOffsetMode;
   rulerMarkMode: RulerMarkMode;
 }

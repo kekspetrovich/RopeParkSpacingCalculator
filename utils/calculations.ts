@@ -12,6 +12,7 @@ export const calculateLayout = (config: AppConfig): CalculationResult => {
     targetGap,
     elementCount: manualCount,
     maxEndGap,
+    fixedTargetGap,
     firstOffsetMode
   } = config;
 
@@ -42,7 +43,7 @@ export const calculateLayout = (config: AppConfig): CalculationResult => {
   let N = manualCount;
   
   if (distributionMode === 'by-gap' && S > 0 && elementType !== 'calculated') {
-    const effectiveEdge = isMaxEndGapLocked ? targetGap : Math.min(M, targetGap);
+    const effectiveEdge = fixedTargetGap ? 0 : (isMaxEndGapLocked ? targetGap : Math.min(M, targetGap));
     const nIdeal = (S - 2 * effectiveEdge + targetGap) / (targetGap + W);
     N = Math.max(1, Math.round(nIdeal));
   }
@@ -51,37 +52,46 @@ export const calculateLayout = (config: AppConfig): CalculationResult => {
   let actualG_inner = 0;
 
   if (S > 0 && N > 0) {
-    const Gu = (S - N * W) / (N + 1);
-    
-    if (elementType === 'calculated') {
-      // Если включен фиксированный отступ, крайние промежутки равны M, внутренние — targetGap
-      if (isFirstOffsetFixed) {
-        actualG_edge = M;
-        actualG_inner = targetGap;
-      } else {
-        actualG_edge = targetGap;
-        actualG_inner = targetGap;
-      }
-    } else if (isFirstOffsetFixed) {
-      // Режим фиксированного отступа: первый отступ всегда равен M
-      actualG_edge = M;
+    if (fixedTargetGap) {
+      actualG_inner = targetGap;
       if (N > 1) {
-        actualG_inner = (S - 2 * M - N * W) / (N - 1);
+        actualG_edge = (S - N * W - (N - 1) * targetGap) / 2;
       } else {
-        // Если только один элемент, ставим его по центру
         actualG_edge = (S - W) / 2;
-        actualG_inner = 0;
       }
-    } else if (isMaxEndGapLocked || Gu <= M + 0.1) {
-      actualG_edge = Gu;
-      actualG_inner = Gu;
     } else {
-      actualG_edge = M;
-      if (N > 1) {
-        actualG_inner = (S - 2 * M - N * W) / (N - 1);
+      const Gu = (S - N * W) / (N + 1);
+      
+      if (elementType === 'calculated') {
+        // Если включен фиксированный отступ, крайние промежутки равны M, внутренние — targetGap
+        if (isFirstOffsetFixed) {
+          actualG_edge = M;
+          actualG_inner = targetGap;
+        } else {
+          actualG_edge = targetGap;
+          actualG_inner = targetGap;
+        }
+      } else if (isFirstOffsetFixed) {
+        // Режим фиксированного отступа: первый отступ всегда равен M
+        actualG_edge = M;
+        if (N > 1) {
+          actualG_inner = (S - 2 * M - N * W) / (N - 1);
+        } else {
+          // Если только один элемент, ставим его по центру
+          actualG_edge = (S - W) / 2;
+          actualG_inner = 0;
+        }
+      } else if (isMaxEndGapLocked || Gu <= M + 0.1) {
+        actualG_edge = Gu;
+        actualG_inner = Gu;
       } else {
-        actualG_edge = (S - W) / 2;
-        actualG_inner = 0;
+        actualG_edge = M;
+        if (N > 1) {
+          actualG_inner = (S - 2 * M - N * W) / (N - 1);
+        } else {
+          actualG_edge = (S - W) / 2;
+          actualG_inner = 0;
+        }
       }
     }
   }
@@ -90,7 +100,7 @@ export const calculateLayout = (config: AppConfig): CalculationResult => {
     warnings.push('Элементы не помещаются');
   }
   
-  if (!isFirstOffsetFixed && !isMaxEndGapLocked && elementType !== 'calculated' && actualG_edge > M + 0.5) {
+  if (!fixedTargetGap && !isFirstOffsetFixed && !isMaxEndGapLocked && elementType !== 'calculated' && actualG_edge > M + 0.5) {
     warnings.push(`1-й отступ (${Math.round(actualG_edge)} мм) превышает макс. отступ (${M} мм)`);
   }
 
